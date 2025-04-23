@@ -1,10 +1,16 @@
 package com.cristian.nbastats.player;
 
 
+import jakarta.persistence.*;
 
+@Entity
+@Table(name = "player")
 public class Player {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     private String name;
     private String team;
     private String position;
