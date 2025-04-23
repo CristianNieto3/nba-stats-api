@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/nbastats.iml" filepath="$PROJECT_DIR$/.idea/nbastats.iml" />
+      <module fileurl="file://$PROJECT_DIR$/nbastats/nbastats.iml" filepath="$PROJECT_DIR$/nbastats/nbastats.iml" />
     </modules>
   </component>
 </project>

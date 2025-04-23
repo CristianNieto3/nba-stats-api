@@ -79,7 +79,7 @@ public class PlayerController {
    }
 
    @GetMapping("/leaders/{stat}")
-   public List<Player> statLeaders(@RequestParam ( required = false , defaultValue = "5") int limit , String stat ) {
+   public List<Player> statLeaders(@RequestParam ( required = false , defaultValue = "5") int limit , @PathVariable String stat ) {
         return statLeaders(limit, stat);
    }
 
