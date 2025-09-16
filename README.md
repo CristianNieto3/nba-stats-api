@@ -18,4 +18,7 @@
 -  **Leaderboard** for top scorers, rebounders, shooters
 -  Real-time data loaded from official NBA stats
 -  Modern, responsive UI with dark theme
-  
+
+
+
+Note: The Python data loader script will be uploaded soon. 
