@@ -1,7 +1,11 @@
 package com.cristian.nbastats.player;
 
-
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "player")
@@ -11,23 +15,32 @@ public class Player {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String name;
+
+    @Column(nullable = false)
     private String team;
+
+    @Column(nullable = false)
     private String position;
+
     private double ppg;
     private double rpg;
     private double apg;
-    private double fg_percent;
-    private double three_pt_percent;
+
+    @Column(name = "fg_percent")
+    private double fgPercent;
+
+    @Column(name = "three_pt_percent")
+    private double threePtPercent;
+
     private int season;
 
-    public Player() { //no-arg
-
+    public Player() {
     }
 
-
     public Player(Long id, String name, String team, String position,
-                  double ppg, double rpg, double apg, double fg_percent, double three_pt_percent, int season) {
+                  double ppg, double rpg, double apg, double fgPercent, double threePtPercent, int season) {
         this.id = id;
         this.name = name;
         this.team = team;
@@ -35,81 +48,9 @@ public class Player {
         this.ppg = ppg;
         this.rpg = rpg;
         this.apg = apg;
-        this.fg_percent = fg_percent;
-        this.three_pt_percent = three_pt_percent;
+        this.fgPercent = fgPercent;
+        this.threePtPercent = threePtPercent;
         this.season = season;
-    }
-
-    public int getSeason() {
-        return season;
-    }
-
-    public void setSeason(int season) {
-        this.season = season;
-    }
-
-    public double getThree_pt_percent() {
-        return three_pt_percent;
-    }
-
-    public void setThree_pt_percent(double three_pt_percent) {
-        this.three_pt_percent = three_pt_percent;
-    }
-
-    public double getFg_percent() {
-        return fg_percent;
-    }
-
-    public void setFg_percent(double fg_percent) {
-        this.fg_percent = fg_percent;
-    }
-
-    public double getApg() {
-        return apg;
-    }
-
-    public void setApg(double apg) {
-        this.apg = apg;
-    }
-
-    public double getRpg() {
-        return rpg;
-    }
-
-    public void setRpg(double rpg) {
-        this.rpg = rpg;
-    }
-
-    public double getPpg() {
-        return ppg;
-    }
-
-    public void setPpg(double ppg) {
-        this.ppg = ppg;
-    }
-
-    public String getPosition() {
-        return position;
-    }
-
-    public void setPosition(String position) {
-        this.position = position;
-    }
-
-    public String getTeam() {
-        return team;
-    }
-
-    public void setTeam(String team) {
-        this.team = team;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
     }
 
     public Long getId() {
@@ -120,19 +61,75 @@ public class Player {
         this.id = id;
     }
 
-    @Override
-    public String toString() {
-        return "Player{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", team='" + team + '\'' +
-                ", position='" + position + '\'' +
-                ", ppg=" + ppg +
-                ", rpg=" + rpg +
-                ", apg=" + apg +
-                ", fg_percent=" + fg_percent +
-                ", three_pt_percent=" + three_pt_percent +
-                ", season=" + season +
-                '}';
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getTeam() {
+        return team;
+    }
+
+    public void setTeam(String team) {
+        this.team = team;
+    }
+
+    public String getPosition() {
+        return position;
+    }
+
+    public void setPosition(String position) {
+        this.position = position;
+    }
+
+    public double getPpg() {
+        return ppg;
+    }
+
+    public void setPpg(double ppg) {
+        this.ppg = ppg;
+    }
+
+    public double getRpg() {
+        return rpg;
+    }
+
+    public void setRpg(double rpg) {
+        this.rpg = rpg;
+    }
+
+    public double getApg() {
+        return apg;
+    }
+
+    public void setApg(double apg) {
+        this.apg = apg;
+    }
+
+    public double getFgPercent() {
+        return fgPercent;
+    }
+
+    public void setFgPercent(double fgPercent) {
+        this.fgPercent = fgPercent;
+    }
+
+    public double getThreePtPercent() {
+        return threePtPercent;
+    }
+
+    public void setThreePtPercent(double threePtPercent) {
+        this.threePtPercent = threePtPercent;
+    }
+
+    public int getSeason() {
+        return season;
+    }
+
+    public void setSeason(int season) {
+        this.season = season;
     }
 }
