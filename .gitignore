@@ -1,0 +1,12 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# AI tool configs (local, machine-specific)
+.continue/
+.agents/
+
+# OS
+.DS_Store
+Thumbs.db
