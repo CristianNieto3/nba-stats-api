@@ -12,3 +12,4 @@ public interface PlayerRepository extends JpaRepository<Player, Long>, JpaSpecif
 
     List<Player> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
 }
+
