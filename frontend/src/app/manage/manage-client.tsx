@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { ApiRequestError, createPlayer, deletePlayer, fetchPlayersPage, updatePlayer, type PlayerWrite } from "@/lib/api";
+import { signIn, signOut, useSignedInAs } from "@/lib/auth";
 import { perGame, percent, teamCode } from "@/lib/format";
 import type { Player } from "@/lib/types";
 import { useQuery } from "@/lib/use-query";
@@ -78,7 +79,9 @@ export function ManageClient() {
   const [editing, setEditing] = useState<Player | "new" | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [writesDisabled, setWritesDisabled] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const signedInAs = useSignedInAs();
 
   const queryKey = `manage-${appliedSearch}-${page}-${refreshKey}`;
   const result = useQuery(queryKey, () =>
@@ -99,6 +102,15 @@ export function ManageClient() {
   }
 
   function handleWriteError(error: ApiRequestError) {
+    // 401: the credentials are missing, wrong, or no longer accepted. Drop them
+    // so the UI stops pretending to be signed in and asks again.
+    if (error.status === 401) {
+      signOut();
+      setEditing(null);
+      setAuthError("Those credentials were rejected. Check them and sign in again.");
+    }
+    // The server only ever issues an admin account, so a 403 on a signed-in
+    // write is the write flag being off rather than a missing role.
     if (error.status === 403) setWritesDisabled(true);
   }
 
@@ -106,15 +118,33 @@ export function ManageClient() {
 
   return (
     <div className="max-w-5xl">
-      <h1 className="font-display font-bold uppercase tracking-wide text-3xl text-ink">Data management</h1>
+      <div className="flex items-baseline justify-between gap-4 flex-wrap">
+        <h1 className="font-display font-bold uppercase tracking-wide text-3xl text-ink">Data management</h1>
+        {signedInAs && (
+          <p className="text-[14px] text-ink-2">
+            Signed in as <span className="font-semibold text-ink">{signedInAs}</span>
+            <button
+              type="button"
+              onClick={() => {
+                signOut();
+                setEditing(null);
+                setStatusMessage(null);
+              }}
+              className="ml-3 font-display uppercase tracking-wider text-[12px] font-semibold border border-hairline rounded-sm px-2.5 py-1 hover:bg-row-hover transition-colors cursor-pointer"
+            >
+              Sign out
+            </button>
+          </p>
+        )}
+      </div>
 
-      {/* Framed honestly: this is an unprotected demo capability, not an admin console. */}
+      {/* Two independent gates: the server's write flag, then the admin credential. */}
       <div className="mt-4 border-l-2 border-hardwood bg-surface border border-hairline rounded-sm px-4 py-3 max-w-3xl">
         <p className="text-[14px] text-ink-2">
-          <span className="font-semibold text-ink">Unprotected local/demo capability.</span> The
-          API’s create, update, and delete endpoints have no authentication — there are no accounts
-          or roles here. A single server flag turns writes on or off; when they’re off, every write
-          returns 403 and this screen says so.
+          <span className="font-semibold text-ink">Reads are public, writes are not.</span> Create,
+          update, and delete need an admin sign-in. Credentials are kept in memory for this tab
+          only, so reloading the page signs you out. A separate server flag can switch writes off
+          entirely, in which case they return 403 whoever you are.
         </p>
       </div>
 
@@ -150,11 +180,13 @@ export function ManageClient() {
             </label>
             <button
               type="button"
+              disabled={!signedInAs}
+              title={signedInAs ? undefined : "Sign in to add a player"}
               onClick={() => {
                 setEditing("new");
                 setStatusMessage(null);
               }}
-              className="font-display uppercase tracking-wider text-[14px] font-semibold bg-accent text-accent-contrast rounded-sm px-4 py-2 hover:opacity-90 transition-opacity cursor-pointer"
+              className="font-display uppercase tracking-wider text-[14px] font-semibold bg-accent text-accent-contrast rounded-sm px-4 py-2 hover:opacity-90 transition-opacity disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
             >
               Add player
             </button>
@@ -206,6 +238,7 @@ export function ManageClient() {
                       <ManageRow
                         key={player.id}
                         player={player}
+                        canWrite={Boolean(signedInAs)}
                         onEdit={() => {
                           setEditing(player);
                           setStatusMessage(null);
@@ -248,32 +281,118 @@ export function ManageClient() {
           </div>
         </div>
 
-        {editing !== null && (
-          <PlayerForm
-            key={editing === "new" ? "new" : editing.id}
-            player={editing === "new" ? null : editing}
-            onCancel={() => setEditing(null)}
-            onSaved={(name, created) => {
-              setEditing(null);
-              setStatusMessage(created ? `Created ${name}.` : `Saved ${name}.`);
-              setWritesDisabled(false);
-              refresh();
-            }}
-            onError={handleWriteError}
-          />
+        {signedInAs === null ? (
+          <AdminSignIn error={authError} onSignedIn={() => setAuthError(null)} />
+        ) : (
+          editing !== null && (
+            <PlayerForm
+              key={editing === "new" ? "new" : editing.id}
+              player={editing === "new" ? null : editing}
+              onCancel={() => setEditing(null)}
+              onSaved={(name, created) => {
+                setEditing(null);
+                setStatusMessage(created ? `Created ${name}.` : `Saved ${name}.`);
+                setWritesDisabled(false);
+                refresh();
+              }}
+              onError={handleWriteError}
+            />
+          )
         )}
       </div>
     </div>
   );
 }
 
+/**
+ * There is no login endpoint to check against — reads are public, so a probe
+ * request would succeed regardless. Credentials are therefore accepted
+ * optimistically and proven by the first write, which surfaces a 401 here.
+ */
+function AdminSignIn({ error, onSignedIn }: { error: string | null; onSignedIn: () => void }) {
+  const [username, setUsername] = useState("admin");
+  const [password, setPassword] = useState("");
+  const [missing, setMissing] = useState(false);
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (username.trim() === "" || password === "") {
+      setMissing(true);
+      return;
+    }
+    setMissing(false);
+    signIn(username.trim(), password);
+    setPassword("");
+    onSignedIn();
+  }
+
+  const inputClass =
+    "bg-surface border border-hairline rounded-sm px-2.5 py-1.5 text-[14px] w-full text-ink placeholder:text-ink-3";
+
+  return (
+    <form
+      onSubmit={submit}
+      className="border border-hairline rounded-md bg-surface px-5 py-4 sticky top-4"
+      aria-label="Admin sign in"
+    >
+      <h2 className="font-display font-semibold uppercase tracking-wider text-lg text-ink">Admin sign in</h2>
+      <p className="mt-1 text-[13px] text-ink-3">
+        Required for create, update and delete. Held in memory only.
+      </p>
+
+      <div className="mt-4 flex flex-col gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="section-label">Username</span>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="section-label">Password</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            className={inputClass}
+          />
+        </label>
+      </div>
+
+      {missing && (
+        <p role="alert" className="mt-3 text-[13px] text-danger">
+          Enter a username and password.
+        </p>
+      )}
+      {error && !missing && (
+        <p role="alert" className="mt-3 text-[13px] text-danger">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        className="mt-4 font-display uppercase tracking-wider text-[14px] font-semibold bg-accent text-accent-contrast rounded-sm px-4 py-2 hover:opacity-90 transition-opacity cursor-pointer"
+      >
+        Sign in
+      </button>
+    </form>
+  );
+}
+
 function ManageRow({
   player,
+  canWrite,
   onEdit,
   onDeleted,
   onError,
 }: {
   player: Player;
+  canWrite: boolean;
   onEdit: () => void;
   onDeleted: (name: string) => void;
   onError: (error: ApiRequestError) => void;
@@ -326,10 +445,22 @@ function ManageRow({
           ) : (
             <>
               {deleteError && <span className="text-[12px] text-danger">{deleteError}</span>}
-              <button type="button" onClick={onEdit} className={actionClass}>
+              <button
+                type="button"
+                onClick={onEdit}
+                disabled={!canWrite}
+                title={canWrite ? undefined : "Sign in to edit"}
+                className={actionClass}
+              >
                 Edit
               </button>
-              <button type="button" onClick={() => setConfirming(true)} className={`${actionClass} text-danger`}>
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                disabled={!canWrite}
+                title={canWrite ? undefined : "Sign in to delete"}
+                className={`${actionClass} text-danger`}
+              >
                 Delete
               </button>
             </>

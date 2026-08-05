@@ -1,3 +1,4 @@
+import { authHeader } from "./auth";
 import type { ApiErrorBody, PageQuery, PageResponse, Player, StatKey } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
@@ -21,11 +22,19 @@ export class ApiRequestError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Reads are public; only the mutating verbs carry credentials, so a signed-in
+  // admin never leaks an Authorization header onto ordinary browsing.
+  const isWrite = (init?.method ?? "GET") !== "GET";
+
   let response: Response;
   try {
     response = await fetch(`${ROOT}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
+      headers: {
+        "Content-Type": "application/json",
+        ...(isWrite ? authHeader() : {}),
+        ...init?.headers,
+      },
     });
   } catch {
     throw new ApiRequestError(0, "The stats API is unreachable.");
