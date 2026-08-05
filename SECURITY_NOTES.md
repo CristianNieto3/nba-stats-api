@@ -20,9 +20,17 @@ The controller allowed every origin. CORS is now centrally configured through `C
 
 ### Public write operations
 
-POST, PUT, and DELETE remain available for local compatibility but can be disabled with `APP_WRITE_ENABLED=false`. The production profile disables them.
+POST, PUT, and DELETE now require HTTP Basic authentication as an admin. Anonymous callers get `401` and authenticated non-admins get `403`. `GET` stays public, which is the point of a stats dashboard.
 
-This flag is not authentication. If remote write access is needed later, protect it with real admin authentication and authorization.
+`APP_WRITE_ENABLED` still exists and is unchanged. The two controls answer different questions: the flag decides whether the write endpoints respond at all, authentication decides who may call them. Disabling the flag remains the stronger option because it removes the surface entirely.
+
+Details worth knowing:
+
+- The credential comes from `ADMIN_USERNAME` and `ADMIN_PASSWORD`. There is deliberately no default password. If it is unset the application still starts, but an unusable random value is installed, so a misconfigured deployment fails closed rather than exposing a known login.
+- The password is held only as a BCrypt hash in memory. It is never written to disk or logged.
+- The API is stateless and re-authenticates each request from the `Authorization` header, so no session cookie exists. CSRF protection is therefore disabled: without a cookie there is nothing for a hostile page to ride on, and a token requirement would only break non-browser clients.
+- Basic authentication sends credentials base64-encoded, not encrypted. It is only safe over HTTPS, which still needs to be terminated at the hosting layer.
+- This is a single hardcoded account, not user management. There are no roles beyond admin, no password rotation, no lockout, and no audit trail.
 
 ### Unsafe runtime defaults
 
@@ -72,12 +80,13 @@ Before public production deployment:
 
 1. Rotate the previously committed database password.
 2. Use a least-privileged PostgreSQL application user rather than a database superuser.
-3. Keep write operations disabled or add admin authentication and authorization.
-4. Add rate limiting at the reverse proxy or API gateway.
-5. Use Flyway or Liquibase for versioned schema migrations.
-6. Add dependency vulnerability scanning and automated update PRs.
-7. Configure HTTPS, secure secret storage, production logging, and database backups at the hosting layer.
-8. Review whether the bundled CSV should remain packaged in the production artifact.
+3. Serve over HTTPS before enabling writes remotely, since Basic credentials are only encoded, not encrypted.
+4. Replace the single in-memory admin account with real user management if more than one operator ever needs access.
+5. Add rate limiting at the reverse proxy or API gateway.
+6. Use Flyway or Liquibase for versioned schema migrations.
+7. Add dependency vulnerability scanning and automated update PRs.
+8. Configure secure secret storage, production logging, and database backups at the hosting layer.
+9. Review whether the bundled CSV should remain packaged in the production artifact.
 
 ## Data import
 

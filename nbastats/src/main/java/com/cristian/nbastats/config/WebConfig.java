@@ -7,6 +7,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
 
+/**
+ * Cross-origin rules for the browser dashboard. Authentication lives in
+ * {@link SecurityConfig}, which reuses the CORS configuration declared here.
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 

@@ -64,7 +64,9 @@ Update `.env` with your local database password. Spring imports this file when t
 | `JPA_DDL_AUTO` | `validate` | Hibernate schema behavior |
 | `JPA_SHOW_SQL` | `false` | SQL logging |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated frontend origins |
-| `APP_WRITE_ENABLED` | `true` | Enables POST, PUT, and DELETE locally |
+| `APP_WRITE_ENABLED` | `false` | Enables POST, PUT, and DELETE |
+| `ADMIN_USERNAME` | `admin` | Username for the write endpoints |
+| `ADMIN_PASSWORD` | none | Password for the write endpoints |
 
 Do not commit `.env`. For production, set real environment variables or secrets through the hosting platform.
 
@@ -207,6 +209,19 @@ Supported leaderboard statistics are `ppg`, `rpg`, `apg`, `fgPercent`, and `thre
 
 Names and teams cannot be blank, stats cannot be negative, percentages must be between 0 and 100, and positions must use NBA position abbreviations.
 
+### Authenticating a write
+
+`GET` endpoints are open. `POST`, `PUT` and `DELETE` require HTTP Basic credentials, and return `401` without them or `403` for an authenticated non-admin:
+
+```bash
+curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" \
+  -X POST http://localhost:8080/api/v1/players \
+  -H "Content-Type: application/json" \
+  -d @player.json
+```
+
+Writes also need `APP_WRITE_ENABLED=true`; otherwise they return `403` regardless of credentials.
+
 ### Error response example
 
 ```json
@@ -236,10 +251,12 @@ The production profile disables write operations and requires `CORS_ALLOWED_ORIG
 ## Security and limitations
 
 - Public GET endpoints are intentional for a stats dashboard.
-- Write endpoints have no authentication. Keep `APP_WRITE_ENABLED=false` outside trusted development environments.
+- Write endpoints require HTTP Basic authentication as `ADMIN_USERNAME` / `ADMIN_PASSWORD`. This is separate from `APP_WRITE_ENABLED`, which removes the write endpoints altogether: the flag decides whether writes are possible, authentication decides who may perform them.
+- No default password ships. If `ADMIN_PASSWORD` is unset the application still starts, but nothing can authenticate, so a misconfigured deployment fails closed.
+- Credentials are held in memory as a BCrypt hash and checked per request. Sessions are stateless, so CSRF protection is disabled: there is no cookie for another site to ride on.
 - CORS is restricted to configured origins and does not allow credentials.
 - Query sorting uses an allowlist, and filtering uses parameterized JPA Criteria queries.
 - Database credentials are no longer stored in source control.
-- There is no rate limiting, authentication, database migration tool, or automated data-refresh job yet.
+- Authentication is a single hardcoded account rather than real user management, and there is still no rate limiting, database migration tool, or automated data-refresh job.
 
 See [SECURITY_NOTES.md](SECURITY_NOTES.md) for the detailed review.
