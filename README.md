@@ -1,6 +1,18 @@
-# NBA Player Stats Hub API
+# NBA Player Stats Hub
 
-Spring Boot REST API for retrieving, searching, filtering, sorting, comparing, and maintaining NBA player statistics. This repository currently contains the backend only.
+Spring Boot REST API for retrieving, searching, filtering, sorting, comparing, and maintaining NBA player statistics, plus a Next.js dashboard frontend in `frontend/`.
+
+## Frontend
+
+The dashboard lives in `frontend/` (Next.js App Router + TypeScript + Tailwind CSS) and talks to the running backend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+It expects the API at `http://localhost:8080` (override with `NEXT_PUBLIC_API_BASE_URL` in `frontend/.env.local`) and runs at `http://localhost:3000`, which matches the backend's default CORS origin. Pages: home overview, roster explorer (`/players`), player detail, leaderboards (`/leaders`), side-by-side compare (`/compare`), and an unauthenticated demo write screen (`/manage`).
 
 ## Tech stack
 
@@ -62,6 +74,14 @@ Create the database:
 
 ```sql
 CREATE DATABASE nba;
+```
+
+Player names are stored with accents (`Luka Dončić`), and name lookups compare
+them through `unaccent()` so a plain-ASCII search still matches. Enable the
+extension once, against the `nba` database:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS unaccent;
 ```
 
 The existing project expects this table:

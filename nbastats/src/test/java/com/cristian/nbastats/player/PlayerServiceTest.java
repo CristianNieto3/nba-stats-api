@@ -29,8 +29,36 @@ class PlayerServiceTest {
         playerRepository.saveAll(List.of(
                 player("LeBron James", "LAL", "SF", 27.5, 8.2, 7.3),
                 player("Stephen Curry", "GSW", "PG", 29.7, 5.4, 6.1),
-                player("Anthony Davis", "LAL", "PF", 24.1, 12.5, 2.8)
+                player("Anthony Davis", "LAL", "PF", 24.1, 12.5, 2.8),
+                player("Luka Dončić", "DAL", "PG", 33.5, 5.0, 7.8),
+                player("Nikola Đurišić", "ATL", "SF", 4.2, 1.6, 0.9)
         ));
+    }
+
+    @Test
+    void searchPlayersByNameIgnoresAccents() {
+        assertThat(playerService.searchPlayersByName("Doncic")).containsExactly("Luka Dončić");
+        assertThat(playerService.searchPlayersByName("Dončić")).containsExactly("Luka Dončić");
+    }
+
+    @Test
+    void searchPlayersByNameIgnoresLettersThatDoNotDecompose() {
+        // Đ carries no combining mark, so stripping accents alone would miss it.
+        assertThat(playerService.searchPlayersByName("Durisic")).containsExactly("Nikola Đurišić");
+    }
+
+    @Test
+    void getPlayerByNameIgnoresAccents() {
+        assertThat(playerService.getPlayerByName("doncic"))
+                .extracting(PlayerResponse::name)
+                .containsExactly("Luka Dončić");
+    }
+
+    @Test
+    void comparePlayersResolvesAccentedNamesFromPlainAscii() {
+        assertThat(playerService.comparePlayers("Luka Doncic", "LeBron James"))
+                .extracting(PlayerResponse::name)
+                .containsExactly("Luka Dončić", "LeBron James");
     }
 
     @Test

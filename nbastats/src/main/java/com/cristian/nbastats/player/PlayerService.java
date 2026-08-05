@@ -2,6 +2,8 @@ package com.cristian.nbastats.player;
 
 import com.cristian.nbastats.player.dto.PlayerRequest;
 import com.cristian.nbastats.player.dto.PlayerResponse;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -98,7 +100,7 @@ public class PlayerService {
     }
 
     public List<PlayerResponse> getPlayerByName(String name) {
-        return playerRepository.findByNameContainingIgnoreCaseOrderByNameAsc(normalizeRequired(name, "name")).stream()
+        return playerRepository.findByNameContainingNormalized(normalizeRequired(name, "name")).stream()
                 .map(PlayerResponse::from)
                 .toList();
     }
@@ -131,9 +133,9 @@ public class PlayerService {
     }
 
     public List<PlayerResponse> comparePlayers(String name1, String name2) {
-        Player first = playerRepository.findFirstByNameIgnoreCase(normalizeRequired(name1, "name1"))
+        Player first = playerRepository.findFirstByNameNormalized(normalizeRequired(name1, "name1"))
                 .orElseThrow(() -> new PlayerNotFoundException("Player not found: " + name1));
-        Player second = playerRepository.findFirstByNameIgnoreCase(normalizeRequired(name2, "name2"))
+        Player second = playerRepository.findFirstByNameNormalized(normalizeRequired(name2, "name2"))
                 .orElseThrow(() -> new PlayerNotFoundException("Player not found: " + name2));
         return List.of(PlayerResponse.from(first), PlayerResponse.from(second));
     }
@@ -220,6 +222,10 @@ public class PlayerService {
         return value.trim();
     }
 
+    private Expression<String> unaccentLower(CriteriaBuilder criteriaBuilder, Expression<String> value) {
+        return criteriaBuilder.function("unaccent", String.class, criteriaBuilder.lower(value));
+    }
+
     private Specification<Player> filters(
             String name,
             String team,
@@ -233,9 +239,14 @@ public class PlayerService {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (name != null && !name.isBlank()) {
+                // unaccent() is applied to both sides so "Doncic" matches "Dončić".
+                // It runs in SQL rather than Java because Java's normalizer leaves
+                // non-decomposable letters such as Đ and ø untouched.
                 predicates.add(criteriaBuilder.like(
-                        criteriaBuilder.lower(root.get("name")),
-                        "%" + name.trim().toLowerCase(Locale.ROOT) + "%"
+                        unaccentLower(criteriaBuilder, root.get("name")),
+                        unaccentLower(criteriaBuilder, criteriaBuilder.literal(
+                                "%" + name.trim() + "%"
+                        ))
                 ));
             }
             if (team != null && !team.isBlank()) {
