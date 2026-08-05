@@ -6,6 +6,8 @@
 # AI tool configs (local, machine-specific)
 .continue/
 .agents/
+AGENTS.md
+CLAUDE.md
 
 # OS
 .DS_Store
