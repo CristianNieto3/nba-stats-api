@@ -1,8 +1,12 @@
 # Render Blueprint for the Spring Boot API.
 #
 # rootDir scopes build triggers to the backend, so frontend-only commits in
-# this monorepo do not rebuild the API. dockerfilePath and dockerContext are
-# resolved from the repo root, not from rootDir.
+# this monorepo do not rebuild the API.
+#
+# dockerfilePath and dockerContext are resolved relative to rootDir, despite
+# Render's docs describing them as repo-root-relative. Using ./nbastats/... here
+# builds a doubled path (/opt/render/project/src/nbastats/nbastats) and fails
+# with "invalid local: resolve". Keep these relative to nbastats/.
 services:
   - type: web
     name: nba-stats-api
@@ -10,8 +14,8 @@ services:
     plan: free
     region: virginia # Same region as the Supabase database (us-east-1).
     rootDir: nbastats
-    dockerfilePath: ./nbastats/Dockerfile
-    dockerContext: ./nbastats
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
