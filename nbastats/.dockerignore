@@ -1,0 +1,10 @@
+# Never ship local secrets. application.properties imports .env when present,
+# so a copied .env would silently override the platform's environment variables.
+.env
+.env.*
+!.env.example
+
+target/
+*.iml
+.idea/
+.mvn/wrapper/maven-wrapper.jar

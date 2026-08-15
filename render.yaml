@@ -1,0 +1,38 @@
+# Render Blueprint for the Spring Boot API.
+#
+# rootDir scopes build triggers to the backend, so frontend-only commits in
+# this monorepo do not rebuild the API. dockerfilePath and dockerContext are
+# resolved from the repo root, not from rootDir.
+services:
+  - type: web
+    name: nba-stats-api
+    runtime: docker
+    plan: free
+    region: virginia # Same region as the Supabase database (us-east-1).
+    rootDir: nbastats
+    dockerfilePath: ./nbastats/Dockerfile
+    dockerContext: ./nbastats
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # Writes are enabled but remain gated by admin HTTP Basic credentials.
+      - key: APP_WRITE_ENABLED
+        value: "true"
+      - key: ADMIN_USERNAME
+        value: admin
+
+      # sync: false keeps these out of source control. Render prompts for them
+      # when the Blueprint is first created.
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Set to the deployed frontend origin once Vercel is live. The prod
+      # profile requires this: the app will not start without it.
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
