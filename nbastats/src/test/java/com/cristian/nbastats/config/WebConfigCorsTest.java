@@ -21,8 +21,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = PlayerController.class)
 @Import({WebConfig.class, SecurityConfig.class})
-@TestPropertySource(properties =
-        "app.cors.allowed-origins=https://nba-stats-hub.vercel.app,https://nba-stats-hub-*.vercel.app")
+@TestPropertySource(properties = "app.cors.allowed-origins="
+        + "https://nba-stats-explorer.vercel.app,"
+        + "https://nba-stats-hub-six.vercel.app,"
+        + "https://nba-stats-*-cristiannieto3s-projects.vercel.app")
 class WebConfigCorsTest {
 
     @Autowired
@@ -33,31 +35,59 @@ class WebConfigCorsTest {
 
     @Test
     void allowsTheProductionOrigin() throws Exception {
-        preflightFrom("https://nba-stats-hub.vercel.app")
-                .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "https://nba-stats-hub.vercel.app"));
+        allows("https://nba-stats-explorer.vercel.app");
     }
 
     @Test
-    void allowsAPreviewDeployOrigin() throws Exception {
-        preflightFrom("https://nba-stats-hub-git-feature-branch.vercel.app")
-                .andExpect(status().isOk())
-                .andExpect(header().string(
-                        "Access-Control-Allow-Origin", "https://nba-stats-hub-git-feature-branch.vercel.app"));
+    void allowsTheAutoAssignedProductionOrigin() throws Exception {
+        allows("https://nba-stats-hub-six.vercel.app");
     }
 
     /**
-     * The wildcard is anchored to this project's subdomain prefix; someone
-     * else's Vercel site must not inherit access to the API.
+     * Preview URLs come in two shapes, per-commit and per-branch, and the host
+     * truncates a long project name in the first: the deployment that created
+     * this project was served from nba-stats-6lfjs01lz-..., not
+     * nba-stats-hub-6lfjs01lz-.... A pattern anchored on the full project name
+     * would miss those, so the wildcard sits directly after nba-stats.
+     */
+    @Test
+    void allowsAPerCommitPreviewOrigin() throws Exception {
+        allows("https://nba-stats-6lfjs01lz-cristiannieto3s-projects.vercel.app");
+    }
+
+    @Test
+    void allowsAPerBranchPreviewOrigin() throws Exception {
+        allows("https://nba-stats-hub-git-feature-branch-cristiannieto3s-projects.vercel.app");
+    }
+
+    /**
+     * The wildcard is bounded on both sides, by the nba-stats prefix and by the
+     * team slug; someone else's Vercel site must not inherit access to the API.
      */
     @Test
     void rejectsAnotherVercelSite() throws Exception {
         preflightFrom("https://somebody-elses-app.vercel.app").andExpect(status().isForbidden());
     }
 
+    /**
+     * The prefix alone is not enough. Vercel subdomains are globally shared and
+     * nba-stats-hub.vercel.app already belongs to a stranger, so a pattern that
+     * stopped at the prefix would hand them the API.
+     */
+    @Test
+    void rejectsAStrangersProjectSharingThePrefix() throws Exception {
+        preflightFrom("https://nba-stats-hub.vercel.app").andExpect(status().isForbidden());
+    }
+
     @Test
     void rejectsAnUnrelatedOrigin() throws Exception {
         preflightFrom("https://evil.example.com").andExpect(status().isForbidden());
+    }
+
+    private void allows(String origin) throws Exception {
+        preflightFrom(origin)
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", origin));
     }
 
     private org.springframework.test.web.servlet.ResultActions preflightFrom(String origin) throws Exception {
