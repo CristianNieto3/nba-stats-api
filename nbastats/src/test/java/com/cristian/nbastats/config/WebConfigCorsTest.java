@@ -22,7 +22,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = PlayerController.class)
 @Import({WebConfig.class, SecurityConfig.class})
 @TestPropertySource(properties = "app.cors.allowed-origins="
-        + "https://nba-stats-explorer.vercel.app,"
         + "https://nba-stats-hub-six.vercel.app,"
         + "https://nba-stats-*-cristiannieto3s-projects.vercel.app")
 class WebConfigCorsTest {
@@ -35,11 +34,6 @@ class WebConfigCorsTest {
 
     @Test
     void allowsTheProductionOrigin() throws Exception {
-        allows("https://nba-stats-explorer.vercel.app");
-    }
-
-    @Test
-    void allowsTheAutoAssignedProductionOrigin() throws Exception {
         allows("https://nba-stats-hub-six.vercel.app");
     }
 
@@ -77,6 +71,17 @@ class WebConfigCorsTest {
     @Test
     void rejectsAStrangersProjectSharingThePrefix() throws Exception {
         preflightFrom("https://nba-stats-hub.vercel.app").andExpect(status().isForbidden());
+    }
+
+    /**
+     * nba-stats-explorer.vercel.app was the intended vanity origin, but the
+     * subdomain is registered to another Vercel account and cannot be claimed,
+     * so it must not stay in the allowlist: whoever owns it could otherwise
+     * deploy a page that calls this API from a browser.
+     */
+    @Test
+    void rejectsTheVanityOriginThatBelongsToAnotherAccount() throws Exception {
+        preflightFrom("https://nba-stats-explorer.vercel.app").andExpect(status().isForbidden());
     }
 
     @Test
