@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# local bundle-inspection scratch; its minified output otherwise trips `npm run lint`
+/bcheck/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

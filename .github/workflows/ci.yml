@@ -1,0 +1,93 @@
+name: CI
+
+# Runs the checks that were previously only ever run by hand. The repo is one
+# unit deployed as two services, so both halves are built on every change: a
+# green tick here is what says "main is safe to auto-deploy", since merging to
+# main ships straight to Render and Vercel with no other gate in between.
+#
+# The two jobs are independent and run in parallel. Neither touches the
+# database or the live services -- backend tests use H2, and the frontend build
+# is a static compile that never calls the API.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run irrelevant. Cancel it
+# rather than paying for both, but never cancel a run on main.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  backend:
+    name: Backend (Java 21)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: nbastats
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: temurin
+          # Caches ~/.m2 keyed on the pom, so a run that changes no dependency
+          # skips re-downloading the whole Spring Boot tree.
+          cache: maven
+
+      - name: Run tests
+        run: ./mvnw --batch-mode test
+
+      - name: Package
+        run: ./mvnw --batch-mode --no-transfer-progress package -DskipTests
+
+  frontend:
+    name: Frontend (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          # 22.13+ rather than plain 22: some dev dependencies declare
+          # ^22.13.0 and older 22.x releases trip EBADENGINE warnings.
+          node-version: '22.13'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci`, not `npm install`: it installs exactly what the lockfile
+      # pins and fails if package.json and the lockfile have drifted apart,
+      # which is the check that matters after a dependency bump.
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # The real gate. Vercel runs this same build on merge, so a failure here
+      # is a failure that would otherwise have taken the site down.
+      - name: Build
+        run: npm run build
+
+      # Fails the run if a dependency has a known high or critical advisory.
+      # Moderate and below are left as Dependabot's job so that routine noise
+      # cannot block a merge.
+      - name: Audit dependencies
+        run: npm audit --audit-level=high

@@ -1,6 +1,34 @@
 # NBA Player Stats Hub
 
+[![CI](https://github.com/CristianNieto3/nba-stats-api/actions/workflows/ci.yml/badge.svg)](https://github.com/CristianNieto3/nba-stats-api/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Spring Boot REST API for retrieving, searching, filtering, sorting, comparing, and maintaining NBA player statistics, plus a Next.js dashboard frontend in `frontend/`.
+
+## Live demo
+
+| | |
+| --- | --- |
+| **Dashboard** | https://nba-stats-hub.vercel.app |
+| **API** | https://nba-stats-api-4jl6.onrender.com/api/v1/players/page?page=0&size=5 |
+
+Real data: 461 active players for the 2025-26 season, refreshed from `stats.nba.com`.
+
+> **First load may take up to two minutes.** The API runs on Render's free tier,
+> which spins the service down after 15 minutes idle; the cold start costs about
+> 115 seconds. A [scheduled ping](.github/workflows/keep-api-warm.yml) keeps it
+> warm on weekday daytimes (09:00-19:00 ET), so outside those hours the first
+> request pays the wake-up cost. The dashboard is not broken, just waking up.
+
+## Architecture
+
+```text
+Next.js dashboard  ->  Spring Boot REST API  ->  PostgreSQL (Supabase)
+   (Vercel)                 (Render)                     ^
+                                                         |
+                                       Python loader (data-loader/), run locally
+                                       because stats.nba.com blocks datacenter IPs
+```
 
 ## Frontend
 

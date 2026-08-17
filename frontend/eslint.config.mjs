@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local bundle-inspection scratch; gitignored, but flat config does not
+    // read .gitignore, so it needs ignoring here too.
+    "bcheck/**",
   ]),
 ]);
 
