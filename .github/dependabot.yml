@@ -1,0 +1,72 @@
+version: 2
+
+# Dependabot's *security* alerts were already active; this file adds *version*
+# updates, which is the half that keeps the repo from drifting far enough
+# behind that a routine bump turns into seven advisories at once.
+#
+# All four ecosystems in the repo are covered. Each one lives in its own
+# directory, and Dependabot does not discover them recursively -- an ecosystem
+# that is not listed here is simply not being updated.
+#
+# Updates are grouped rather than raised one PR per dependency. A portfolio
+# repo with a single maintainer drowns in ungrouped Dependabot noise, and PRs
+# nobody reads are worse than none: they train you to ignore the ones that
+# matter. Grouping keeps it to roughly one reviewable PR per ecosystem.
+
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # next and eslint-config-next are version-matched; skewing them causes
+      # lint config errors, so they must move together in one PR.
+      next:
+        patterns:
+          - next
+          - eslint-config-next
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: maven
+    directory: /nbastats
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: pip
+    directory: /data-loader
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # nba_api is deliberately left out of the grouped updates. Its pins are
+    # loose and an unattended upgrade can rename columns in the stats frames,
+    # which silently blanks out fields rather than failing loudly. It gets its
+    # own PR so the loader can be run end to end before merging.
+    groups:
+      minor-and-patch:
+        patterns:
+          - '*'
+        exclude-patterns:
+          - nba_api
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns:
+          - '*'

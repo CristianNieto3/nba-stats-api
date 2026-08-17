@@ -7,9 +7,16 @@ Spring Boot REST API for retrieving, searching, filtering, sorting, comparing, a
 
 ## Live demo
 
+<!-- The dashboard URL is nba-stats-hub-SIX.vercel.app. Do not "tidy" it to
+     nba-stats-hub.vercel.app: that subdomain belongs to a different Vercel
+     account, and it also happens to be an NBA stats site, so it returns a
+     healthy 200 and looks correct. Vercel assigned the -six suffix precisely
+     because the bare name was already taken. WebConfigCorsTest has a test
+     asserting the bare name is rejected by CORS. -->
+
 | | |
 | --- | --- |
-| **Dashboard** | https://nba-stats-hub.vercel.app |
+| **Dashboard** | https://nba-stats-hub-six.vercel.app |
 | **API** | https://nba-stats-api-4jl6.onrender.com/api/v1/players/page?page=0&size=5 |
 
 Real data: 461 active players for the 2025-26 season, refreshed from `stats.nba.com`.
@@ -53,18 +60,26 @@ It expects the API at `http://localhost:8080` (override with `NEXT_PUBLIC_API_BA
 
 ## Project layout
 
-The runnable Maven project is in `nbastats/`.
+Three deployable pieces in one repository. The runnable Maven project is in
+`nbastats/`.
 
 ```text
-nbastats/
+nbastats/         Spring Boot REST API -> Render
   src/main/java/com/cristian/nbastats/
-    config/       CORS configuration
+    config/       CORS and HTTP Basic security configuration
     error/        Consistent API error handling
     player/       Player controller, service, repository, entity, and DTOs
   src/main/resources/
     application.properties
     application-prod.properties
-    nba_players.csv
+    nba_players.csv          12-row starter fixture
+
+frontend/         Next.js App Router dashboard -> Vercel
+  src/app/        Routes: home, players, leaders, compare, manage
+  src/components/ Shared UI
+  src/lib/        API client, auth, formatting, hooks
+
+data-loader/      Python loader for stats.nba.com -> run locally, not in CI
 ```
 
 ## Requirements
@@ -152,7 +167,25 @@ If explicit IDs are imported, synchronize the identity sequence:
 SELECT setval(pg_get_serial_sequence('player', 'id'), COALESCE(MAX(id), 1)) FROM player;
 ```
 
-No Python `nba_api` import script is currently present in this repository.
+The CSV is only a starter fixture. For real data, see [Loading real NBA data](#loading-real-nba-data) below.
+
+## Loading real NBA data
+
+`data-loader/` holds a Python loader that rebuilds the `player` table from
+`stats.nba.com`. One run costs about 31 HTTP requests and takes roughly two
+minutes; see [data-loader/README.md](data-loader/README.md) for the details.
+
+It runs on a local machine on purpose, not in CI. `stats.nba.com` blocks
+datacenter IP ranges, so the same script that works from a laptop fails from
+GitHub Actions or any cloud host. Credentials live outside the repo entirely,
+in `%USERPROFILE%\.nba-loader\config.ps1`.
+
+```powershell
+cd data-loader
+.\setup_venv.ps1        # once
+.\run_refresh.ps1       # a single refresh
+.\register_task.ps1     # optional: run it on a schedule
+```
 
 ## Run the backend
 
@@ -289,7 +322,8 @@ The production profile disables write operations and requires `CORS_ALLOWED_ORIG
 - Credentials are held in memory as a BCrypt hash and checked per request. Sessions are stateless, so CSRF protection is disabled: there is no cookie for another site to ride on.
 - CORS is restricted to configured origins and does not allow credentials.
 - Query sorting uses an allowlist, and filtering uses parameterized JPA Criteria queries.
-- Database credentials are no longer stored in source control.
-- Authentication is a single hardcoded account rather than real user management, and there is still no rate limiting, database migration tool, or automated data-refresh job.
+- Database credentials are no longer stored in source control, and the password that was previously committed has been purged from Git history.
+- Dependencies are scanned on every push (`npm audit` in CI) and by Dependabot.
+- Known gaps, stated plainly: authentication is a single hardcoded account rather than real user management, HTTP Basic has no rate limiting or lockout behind it, and there is no database migration tool. The data refresh is a scheduled local task rather than a hosted job, because `stats.nba.com` blocks datacenter IPs.
 
 See [SECURITY_NOTES.md](SECURITY_NOTES.md) for the detailed review.
