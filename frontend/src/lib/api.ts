@@ -68,6 +68,16 @@ export function fetchPlayersPage(query: PageQuery): Promise<PageResponse<Player>
   return request(`/page?${params}`);
 }
 
+/**
+ * Total roster size. Asks for a single row and reads the page total rather than
+ * counting `fetchAllPlayers()`, so the landing page pulls a few hundred bytes
+ * instead of ~70KB to render one number.
+ */
+export async function fetchPlayerCount(): Promise<number> {
+  const page = await fetchPlayersPage({ page: "0", size: "1" });
+  return page.totalElements;
+}
+
 export function fetchPlayer(id: number | string): Promise<Player> {
   return request(`/${id}`);
 }

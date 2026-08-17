@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetchTopScorers, resolvePlayerByName } from "@/lib/api";
+import { fetchPlayerCount, fetchTopScorers, resolvePlayerByName } from "@/lib/api";
 import { fetchLeagueMaxima } from "@/lib/options";
 import { perGame, teamCode } from "@/lib/format";
 import { useQuery } from "@/lib/use-query";
@@ -30,6 +30,9 @@ export function HomeClient() {
     return { ppg, rpg, apg };
   });
   const topScorers = useQuery("home-top-scorers", () => fetchTopScorers(5));
+  // Read live rather than hardcoded: the roster is refreshed on a schedule now,
+  // so any number written into this copy is a number that goes stale by itself.
+  const playerCount = useQuery("home-player-count", fetchPlayerCount);
   // Warm the league-maxima cache so detail pages render their scales instantly.
   useQuery("league-maxima", fetchLeagueMaxima);
 
@@ -51,7 +54,8 @@ export function HomeClient() {
           The 2025 season, in numbers
         </h1>
         <p className="mt-2 text-[16px] text-ink-2">
-          240 players. Five stats each. Filter the roster, rank the leaders, or put two players
+          {playerCount.data === null ? "" : `${playerCount.data} players. `}
+          Five stats each. Filter the roster, rank the leaders, or put two players
           side by side.
         </p>
         <div className="mt-5 max-w-md">
@@ -131,7 +135,7 @@ export function HomeClient() {
       <section className="mt-10 grid sm:grid-cols-3 gap-4 max-w-3xl" aria-label="Explore">
         {(
           [
-            ["/players", "Players", "Filter and sort the full 240-player roster."],
+            ["/players", "Players", "Filter and sort the full roster."],
             ["/leaders", "Leaders", "Ranked leaderboards for all five stats."],
             ["/compare", "Compare", "Two players, stat by stat, honestly scaled."],
           ] as const
