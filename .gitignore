@@ -12,3 +12,11 @@ CLAUDE.md
 # OS
 .DS_Store
 Thumbs.db
+
+# Loader credentials. The real config lives in %USERPROFILE%\.nba-loader\, well
+# outside this tree -- this rule only exists so that a copy made in the wrong
+# place cannot be committed to what is a public repository.
+data-loader/config.ps1
+data-loader/.env
+data-loader/venv/
+data-loader/__pycache__/
