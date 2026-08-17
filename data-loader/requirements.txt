@@ -2,7 +2,7 @@
 # Regenerate deliberately, not opportunistically: an unpinned nba_api upgrade
 # can change column names in the stats frames and silently blank out fields.
 
-nba_api==1.6.1
+nba_api==1.11.4
 
 # nba_api's own pins are loose, so pin what it pulls in as well.
 pandas==2.2.3
@@ -11,4 +11,4 @@ requests==2.34.2
 
 # psycopg2-binary, not psycopg2: the ubuntu runner has no libpq-dev, so the
 # source distribution fails to build. Same `import psycopg2` either way.
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.12
