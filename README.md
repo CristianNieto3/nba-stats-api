@@ -7,9 +7,16 @@ Spring Boot REST API for retrieving, searching, filtering, sorting, comparing, a
 
 ## Live demo
 
+<!-- The dashboard URL is nba-stats-hub-SIX.vercel.app. Do not "tidy" it to
+     nba-stats-hub.vercel.app: that subdomain belongs to a different Vercel
+     account, and it also happens to be an NBA stats site, so it returns a
+     healthy 200 and looks correct. Vercel assigned the -six suffix precisely
+     because the bare name was already taken. WebConfigCorsTest has a test
+     asserting the bare name is rejected by CORS. -->
+
 | | |
 | --- | --- |
-| **Dashboard** | https://nba-stats-hub.vercel.app |
+| **Dashboard** | https://nba-stats-hub-six.vercel.app |
 | **API** | https://nba-stats-api-4jl6.onrender.com/api/v1/players/page?page=0&size=5 |
 
 Real data: 461 active players for the 2025-26 season, refreshed from `stats.nba.com`.
