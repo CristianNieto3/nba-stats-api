@@ -20,3 +20,7 @@ data-loader/config.ps1
 data-loader/.env
 data-loader/venv/
 data-loader/__pycache__/
+
+# Local working notes for handing context between sessions. Session
+# scaffolding, not part of the project.
+HANDOFF.md
