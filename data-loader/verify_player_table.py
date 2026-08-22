@@ -8,6 +8,11 @@ looks at what actually landed, so a run that reported success while committing
 nothing -- or committing to the wrong database -- fails loudly instead of
 passing quietly.
 
+It also checks the values, not just the row count. Every count-based guard in
+this project is blind to the loader's most likely failure: a renamed column
+upstream makes safe_float() return its 0.0 default for every player, so a full
+table of zeros has exactly the right number of rows and passes everything else.
+
 Usage:
     python verify_player_table.py --print-count
     python verify_player_table.py --min-rows 461 --expect-season 2025
@@ -26,6 +31,45 @@ MIN_ROWS_RATIO = 0.9
 # A table this small is never a real refresh, whatever the ratio says. It also
 # closes the hole where a previously-empty table makes the ratio check vacuous.
 ABSOLUTE_FLOOR = 300
+
+# Everything above counts rows. None of it looks at what is IN them, and the
+# loader's most likely failure does not change the row count at all: it reads
+# stats as safe_float(row.get("PTS")), which returns 0.0 when a column is
+# missing. Rename PTS upstream and every player gets 0.0 points, the row count
+# is untouched, the ratio check passes, and a table of zeros is committed and
+# verified clean. These checks exist to make that loud.
+#
+# Minimum share of rows that must be non-zero for each stat. Real values, taken
+# from a live season: assists are non-zero for ~98% of players and three-point
+# percentage for ~89%, so these floors sit well below anything legitimate.
+# three_pt_percent gets the loosest floor because plenty of centres never
+# attempt one.
+MIN_NONZERO_RATIO = {
+    "ppg": 0.50,
+    "rpg": 0.50,
+    "apg": 0.50,
+    "fg_percent": 0.50,
+    "three_pt_percent": 0.25,
+}
+
+# The other direction. The loader multiplies FG_PCT and FG3_PCT by 100 because
+# the endpoint returns them as fractions; if that ever changes upstream, the
+# multiply turns 0.476 into 4760.0 rather than failing. Percentages are also
+# CHECK-free at the database level, so nothing else would catch it.
+MAX_PLAUSIBLE = {
+    "ppg": 60.0,
+    "rpg": 30.0,
+    "apg": 25.0,
+    "fg_percent": 100.0,
+    "three_pt_percent": 100.0,
+}
+
+# Somebody always leads the league by a distance. If the best scorer in the
+# table is under this, the stats did not load, whatever the per-column ratios
+# say.
+MIN_LEAGUE_MAX_PPG = 15.0
+
+STAT_COLUMNS = tuple(MIN_NONZERO_RATIO)
 
 
 def connect():
@@ -77,6 +121,18 @@ def main():
 
             cur.execute("SELECT count(*) FROM player WHERE name IS NULL OR name = '';")
             nameless = cur.fetchone()[0]
+
+            # One pass for every stat column: how many rows are non-zero, and
+            # what the largest value is.
+            selects = ", ".join(
+                f"count(*) FILTER (WHERE {c} <> 0), max({c})" for c in STAT_COLUMNS
+            )
+            cur.execute(f"SELECT {selects} FROM player;")
+            stat_row = cur.fetchone()
+            stats = {
+                c: {"nonzero": stat_row[i * 2], "max": stat_row[i * 2 + 1]}
+                for i, c in enumerate(STAT_COLUMNS)
+            }
     finally:
         conn.close()
 
@@ -101,6 +157,35 @@ def main():
 
     if nameless:
         failures.append(f"{nameless} rows have a null or empty name")
+
+    if rows:
+        for column in STAT_COLUMNS:
+            nonzero = stats[column]["nonzero"]
+            largest = stats[column]["max"] or 0.0
+            ratio = nonzero / rows
+            print(f"  {column}: {nonzero}/{rows} non-zero ({ratio:.0%}), max {largest:g}")
+
+            floor = MIN_NONZERO_RATIO[column]
+            if ratio < floor:
+                failures.append(
+                    f"{column} is non-zero in only {nonzero} of {rows} rows "
+                    f"({ratio:.0%}, expected at least {floor:.0%}) -- the column "
+                    "this maps to has probably been renamed upstream"
+                )
+
+            ceiling = MAX_PLAUSIBLE[column]
+            if largest > ceiling:
+                failures.append(
+                    f"{column} reaches {largest:g}, above the plausible maximum of "
+                    f"{ceiling:g} -- check whether the source changed scale"
+                )
+
+        best_ppg = stats["ppg"]["max"] or 0.0
+        if best_ppg < MIN_LEAGUE_MAX_PPG:
+            failures.append(
+                f"the highest ppg in the table is {best_ppg:g}, under "
+                f"{MIN_LEAGUE_MAX_PPG:g} -- no real season looks like this"
+            )
 
     if failures:
         print("\nVERIFICATION FAILED:")
