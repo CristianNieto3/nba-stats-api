@@ -325,16 +325,3 @@ $env:SPRING_PROFILES_ACTIVE = "prod"
 ```
 
 The production profile disables write operations and requires `CORS_ALLOWED_ORIGINS` to be set. If production writes are eventually needed, add authentication and authorization before enabling them.
-
-## Security and limitations
-
-- Public GET endpoints are intentional for a stats dashboard.
-- Write endpoints require HTTP Basic authentication as `ADMIN_USERNAME` / `ADMIN_PASSWORD`. This is separate from `APP_WRITE_ENABLED`, which removes the write endpoints altogether: the flag decides whether writes are possible, authentication decides who may perform them.
-- No default password ships. If `ADMIN_PASSWORD` is unset the application still starts, but nothing can authenticate, so a misconfigured deployment fails closed.
-- Credentials are held in memory as a BCrypt hash and checked per request. Sessions are stateless, so CSRF protection is disabled: there is no cookie for another site to ride on.
-- CORS is restricted to configured origins and does not allow credentials.
-- Query sorting uses an allowlist, and filtering uses parameterized JPA Criteria queries.
-- Database credentials are no longer stored in source control, and the password that was previously committed has been purged from Git history.
-- Dependencies are scanned on every push (`npm audit` in CI) and by Dependabot.
-- Known gaps, stated plainly: authentication is a single hardcoded account rather than real user management, HTTP Basic has no rate limiting or lockout behind it, and there is no database migration tool. The data refresh is a scheduled local task rather than a hosted job, because `stats.nba.com` blocks datacenter IPs.
-
