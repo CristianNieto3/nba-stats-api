@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NBA Player Stats Hub — dashboard
 
-## Getting Started
+Next.js App Router frontend for the [NBA Player Stats Hub](../README.md) API.
+TypeScript, Tailwind CSS, and the Barlow font families self-hosted through
+[`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts).
 
-First, run the development server:
+Deployed to Vercel at https://nba-stats-hub-six.vercel.app
+
+## Routes
+
+| Route | Purpose |
+| --- | --- |
+| `/` | Overview: league-wide highlights and entry points |
+| `/players` | Roster explorer with search, filters, sorting, and pagination |
+| `/players/[id]` | Single-player detail |
+| `/leaders` | Leaderboards per statistic |
+| `/compare` | Side-by-side comparison of two players |
+| `/manage` | Admin-authenticated create, update, and delete |
+
+`/manage` requires HTTP Basic credentials, and the backend only accepts writes
+when `APP_WRITE_ENABLED=true`.
+
+## Running locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The dashboard starts at `http://localhost:3000`, which matches the backend's
+default CORS origin. It expects the API at `http://localhost:8080`, so start the
+Spring Boot service first — see the [root README](../README.md#run-the-backend).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build     # production build
+npm run lint      # ESLint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Configuration
 
-## Learn More
+Set `NEXT_PUBLIC_API_BASE_URL` to the Spring Boot API base URL without a
+trailing slash, in `.env.local` for development or in the Vercel project
+settings for deployments.
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8080` | Base URL of the Spring Boot API |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+It must be a valid HTTP(S) URL and must be available at **build** time, not just
+at runtime: Next.js inlines `NEXT_PUBLIC_*` values into the bundle, and this
+one's origin is also compiled into the Content Security Policy. Changing it
+requires a rebuild.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Security headers
 
-## Deploy on Vercel
+`next.config.ts` sends an enforced Content Security Policy plus
+`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, and
+`Permissions-Policy` on every response, and disables the `X-Powered-By` header.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The policy allows browser connections only to the dashboard's own origin and the
+configured API origin; framing, plugins, and inline event handlers are blocked
+outright. Inline scripts and styles stay allowed, because statically rendered
+Next.js pages need them — a nonce-based policy would force every page to render
+dynamically. `unsafe-eval` and WebSocket origins are added by the development
+server only and are absent from production builds.
