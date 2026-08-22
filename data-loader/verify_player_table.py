@@ -15,7 +15,7 @@ table of zeros has exactly the right number of rows and passes everything else.
 
 Usage:
     python verify_player_table.py --print-count
-    python verify_player_table.py --min-rows 461 --expect-season 2025
+    python verify_player_table.py --min-rows 516 --expect-season 2025
 """
 
 import argparse
