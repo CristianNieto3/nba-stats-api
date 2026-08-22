@@ -11,4 +11,4 @@ requests==2.34.2
 
 # psycopg2-binary, not psycopg2: the ubuntu runner has no libpq-dev, so the
 # source distribution fails to build. Same `import psycopg2` either way.
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.12
