@@ -51,11 +51,18 @@ updates:
     # loose and an unattended upgrade can rename columns in the stats frames,
     # which silently blanks out fields rather than failing loudly. It gets its
     # own PR so the loader can be run end to end before merging.
+    #
+    # Both spellings are listed on purpose. Dependabot matches these patterns
+    # against the PEP 503 normalised project name, where underscores become
+    # hyphens, so `nba_api` alone never matched and the exclusion silently did
+    # nothing: PR #8 grouped nba_api 1.6.1 -> 1.11.4 in with a psycopg2 patch,
+    # which is exactly what this block exists to prevent.
     groups:
       minor-and-patch:
         patterns:
           - '*'
         exclude-patterns:
+          - nba-api
           - nba_api
         update-types:
           - minor
