@@ -338,4 +338,3 @@ The production profile disables write operations and requires `CORS_ALLOWED_ORIG
 - Dependencies are scanned on every push (`npm audit` in CI) and by Dependabot.
 - Known gaps, stated plainly: authentication is a single hardcoded account rather than real user management, HTTP Basic has no rate limiting or lockout behind it, and there is no database migration tool. The data refresh is a scheduled local task rather than a hosted job, because `stats.nba.com` blocks datacenter IPs.
 
-See [SECURITY_NOTES.md](SECURITY_NOTES.md) for the detailed review.
