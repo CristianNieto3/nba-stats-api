@@ -5,14 +5,14 @@
 
 Spring Boot REST API for retrieving, searching, filtering, sorting, comparing, and maintaining NBA player statistics, plus a Next.js dashboard frontend in `frontend/`.
 
+![The NBA Stats Hub dashboard home page, showing league leaders and the top five scorers for the 2025-26 season](docs/screenshots/home.png)
+
 ## Live demo
 
-<!-- The dashboard URL is nba-stats-hub-SIX.vercel.app. Do not "tidy" it to
-     nba-stats-hub.vercel.app: that subdomain belongs to a different Vercel
-     account, and it also happens to be an NBA stats site, so it returns a
-     healthy 200 and looks correct. Vercel assigned the -six suffix precisely
-     because the bare name was already taken. WebConfigCorsTest has a test
-     asserting the bare name is rejected by CORS. -->
+<!-- The -six suffix is part of the hostname, not a typo. Vercel appended it
+     because nba-stats-hub.vercel.app was already taken; that bare subdomain is
+     an unrelated account's NBA stats site, so it serves a healthy 200 and looks
+     plausible. WebConfigCorsTest asserts the bare name is rejected by CORS. -->
 
 | | |
 | --- | --- |
@@ -26,6 +26,17 @@ Real data: 461 active players for the 2025-26 season, refreshed from `stats.nba.
 > 115 seconds. A [scheduled ping](.github/workflows/keep-api-warm.yml) keeps it
 > warm on weekday daytimes (09:00-19:00 ET), so outside those hours the first
 > request pays the wake-up cost. The dashboard is not broken, just waking up.
+
+## Screenshots
+
+| | |
+| --- | --- |
+| **Roster explorer** — filter by name, team, position, and stat minimums, then sort any column. | **Leaderboards** — ranked per statistic, with bars scaled to the league maximum. |
+| [![Roster explorer listing all 461 players with filter controls and a sortable stats table](docs/screenshots/players.png)](docs/screenshots/players.png) | [![Points-per-game leaderboard showing the top ten scorers](docs/screenshots/leaders.png)](docs/screenshots/leaders.png) |
+
+**Compare** — two players, one stat per row, bars scaled to the league maximum so the gaps are honest.
+
+[![Side-by-side comparison of Luka Doncic and Shai Gilgeous-Alexander across five statistics](docs/screenshots/compare.png)](docs/screenshots/compare.png)
 
 ## Architecture
 
