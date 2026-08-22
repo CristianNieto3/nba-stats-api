@@ -19,7 +19,8 @@ Spring Boot REST API for retrieving, searching, filtering, sorting, comparing, a
 | **Dashboard** | https://nba-stats-hub-six.vercel.app |
 | **API** | https://nba-stats-api-4jl6.onrender.com/api/v1/players/page?page=0&size=5 |
 
-Real data: 461 active players for the 2025-26 season, refreshed from `stats.nba.com`.
+Real data for the 2025-26 season, refreshed from `stats.nba.com`: every active
+player with a game played, 516 of them at the most recent refresh.
 
 > **First load may take up to two minutes.** The API runs on Render's free tier,
 > which spins the service down after 15 minutes idle; the cold start costs about
@@ -32,7 +33,7 @@ Real data: 461 active players for the 2025-26 season, refreshed from `stats.nba.
 | | |
 | --- | --- |
 | **Roster explorer** — filter by name, team, position, and stat minimums, then sort any column. | **Leaderboards** — ranked per statistic, with bars scaled to the league maximum. |
-| [![Roster explorer listing all 461 players with filter controls and a sortable stats table](docs/screenshots/players.png)](docs/screenshots/players.png) | [![Points-per-game leaderboard showing the top ten scorers](docs/screenshots/leaders.png)](docs/screenshots/leaders.png) |
+| [![Roster explorer listing every active player with filter controls and a sortable stats table](docs/screenshots/players.png)](docs/screenshots/players.png) | [![Points-per-game leaderboard showing the top ten scorers](docs/screenshots/leaders.png)](docs/screenshots/leaders.png) |
 
 **Compare** — two players, one stat per row, bars scaled to the league maximum so the gaps are honest.
 
