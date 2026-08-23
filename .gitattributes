@@ -1,0 +1,26 @@
+# Normalise line endings so a checkout is byte-identical on every machine.
+#
+# Without this file each clone's core.autocrlf setting decides, and CRLF can
+# reach the stored blob. That is what happened when the Maven wrapper was bumped
+# in #7: mvnw.cmd landed with CRLF, and any clone configured to normalise on
+# staging showed all 189 lines as modified straight after checkout. #23 undid it
+# by hand. These rules stop it recurring rather than relying on every clone
+# being configured the same way.
+#
+# text=auto stores every text file with LF whatever platform committed it.
+# eol=lf checks it back out that way too, so the working tree matches across
+# machines instead of differing by platform default.
+* text=auto eol=lf
+
+# Windows shells are the one place CRLF still earns its keep: cmd.exe can
+# mis-parse a batch file whose multi-line constructs end in bare LF. Only the
+# checked-out copy gets CRLF -- the stored blob stays LF, which is what #23
+# restored. nbastats/.gitattributes already sets this for the Maven wrapper;
+# stated here too so it covers any .cmd or .bat added elsewhere later.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Declared rather than left to content sniffing, so a diff never tries to
+# render them as text.
+*.png binary
+*.ico binary
