@@ -1,5 +1,6 @@
 package com.cristian.nbastats.player;
 
+import com.cristian.nbastats.player.dto.LeaderboardResponse;
 import com.cristian.nbastats.player.dto.PlayerRequest;
 import com.cristian.nbastats.player.dto.PlayerResponse;
 import jakarta.validation.Valid;
@@ -129,13 +130,18 @@ public class PlayerController {
         return playerService.comparePlayers(name1, name2);
     }
 
+    /**
+     * Ranked over players meeting the NBA's published minimums, with the
+     * players those minimums exclude returned alongside so the dashboard can
+     * show them flagged rather than pretend they do not exist.
+     */
     @GetMapping("/leaders/{stat}")
-    public List<PlayerResponse> statLeaders(
+    public LeaderboardResponse statLeaders(
             @PathVariable String stat,
             @RequestParam(defaultValue = "5") @Positive int limit
     ) {
         validateLimit(limit);
-        return playerService.leaders(limit, stat);
+        return playerService.leaderboard(stat, limit);
     }
 
     @PostMapping

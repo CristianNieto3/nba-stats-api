@@ -1,5 +1,5 @@
 import { authHeader } from "./auth";
-import type { ApiErrorBody, PageQuery, PageResponse, Player, StatKey } from "./types";
+import type { ApiErrorBody, Leaderboard, PageQuery, PageResponse, Player, StatKey } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 const ROOT = `${API_BASE}/api/v1/players`;
@@ -98,7 +98,13 @@ export function comparePlayers(name1: string, name2: string): Promise<Player[]> 
   return request(`/compare?name1=${encodeURIComponent(name1)}&name2=${encodeURIComponent(name2)}`);
 }
 
-export function fetchLeaders(stat: StatKey, limit: number): Promise<Player[]> {
+/**
+ * Returns the ranked board, the thresholds it was built with, and the players
+ * those thresholds excluded. The excluded list is the interesting half: a
+ * centre at 100% on one attempt is what a reader wants explained, and the old
+ * shape had nowhere to say it.
+ */
+export function fetchLeaders(stat: StatKey, limit: number): Promise<Leaderboard> {
   return request(`/leaders/${stat}?limit=${limit}`);
 }
 

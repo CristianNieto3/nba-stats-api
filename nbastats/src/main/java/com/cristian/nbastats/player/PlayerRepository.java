@@ -35,4 +35,13 @@ public interface PlayerRepository extends JpaRepository<Player, Long>, JpaSpecif
             nativeQuery = true
     )
     List<Player> findByNameContainingNormalized(@Param("name") String name);
+
+    /**
+     * Stands in for "games the furthest-along team has played", which is what
+     * the NBA prorates its in-season minimums against. The player table carries
+     * no schedule, so the largest games-played value is the closest proxy
+     * available; see QualificationRules.prorate.
+     */
+    @Query("SELECT COALESCE(MAX(p.gamesPlayed), 0) FROM Player p")
+    int findMaxGamesPlayed();
 }
