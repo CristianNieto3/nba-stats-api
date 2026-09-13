@@ -1,5 +1,5 @@
 import { fetchAllPlayers, fetchLeaders } from "./api";
-import { STATS, statValue, type StatKey } from "./types";
+import { STATS, type StatKey } from "./types";
 
 /**
  * Filter options are derived from the data actually stored — the position
@@ -25,12 +25,18 @@ export type LeagueMaxima = Record<StatKey, number>;
 
 let maximaPromise: Promise<LeagueMaxima> | null = null;
 
-/** League maximum per stat (leaders/{stat}?limit=1) — the scale anchor for every contextual bar. */
+/**
+ * League maximum per stat — the scale anchor for every contextual bar.
+ *
+ * Anchored on the qualified leader, which is the whole point: anchoring on the
+ * raw maximum scaled every three-point bar on the site against a player who
+ * went 1-for-1, so a genuine 41% season rendered as a 41%-full bar.
+ */
 export function fetchLeagueMaxima(): Promise<LeagueMaxima> {
   maximaPromise ??= Promise.all(
     STATS.map(async (stat) => {
-      const [leader] = await fetchLeaders(stat.key, 1);
-      return [stat.key, leader ? statValue(leader, stat.key) : 0] as const;
+      const board = await fetchLeaders(stat.key, 1);
+      return [stat.key, board.leaders[0]?.value ?? 0] as const;
     }),
   )
     .then((entries) => Object.fromEntries(entries) as LeagueMaxima)

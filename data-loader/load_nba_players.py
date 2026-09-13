@@ -135,6 +135,15 @@ def safe_float(value, default=0.0):
         return default
 
 
+def safe_int(value, default=0):
+    try:
+        if value is None:
+            return default
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return default
+
+
 POSITION_WORDS = {"G": "Guard", "F": "Forward", "C": "Center"}
 
 
@@ -233,8 +242,10 @@ def insert_player(cursor, player_data):
     cursor.execute(
         """
         INSERT INTO player
-        (name, team, position, ppg, rpg, apg, fg_percent, three_pt_percent, season)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (name, team, position, ppg, rpg, apg, fg_percent, three_pt_percent, ft_percent, season,
+         games_played, fgm, fga, fg3m, fg3a, ftm, fta)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s)
         """,
         player_data,
     )
@@ -296,6 +307,36 @@ def fetch_and_insert_players():
         }
         print(f"Fetched current-season stats for {len(stats_by_player_id)} players.")
 
+        # The per-game response above carries FGM/FGA/FG3M/FG3A as per-game
+        # averages, so recovering season totals from it means multiplying a
+        # rounded average by GP. The leaderboard minimums are counted in whole
+        # made shots (82 threes, 300 field goals), and that arithmetic puts a
+        # player either side of the line often enough to matter. One more
+        # league-wide request returns them as exact integers, which is cheap
+        # next to the 30 roster calls this run already makes.
+        random_delay(TEAM_REQUEST_DELAY_SECONDS)
+        totals = fetch_with_retry(
+            lambda: leaguedashplayerstats.LeagueDashPlayerStats(
+                season=target_season_id,
+                per_mode_detailed="Totals",
+                season_type_all_star="Regular Season",
+                headers=NBA_HEADERS,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            ),
+            label=f"league player totals for {target_season_id}",
+        )
+        totals_df = totals.get_data_frames()[0]
+
+        if totals_df.empty:
+            raise RuntimeError(f"No season totals returned for season {target_season_id}.")
+
+        totals_by_player_id = {
+            int(row["PLAYER_ID"]): row
+            for _, row in totals_df.iterrows()
+            if row.get("PLAYER_ID") is not None
+        }
+        print(f"Fetched season totals for {len(totals_by_player_id)} players.")
+
         position_by_player_id = build_position_map(target_season_id)
 
         # Every remaining field comes from data already in memory, so from here
@@ -328,6 +369,20 @@ def fetch_and_insert_players():
             apg = safe_float(season_row.get("AST"))
             fg_percent = safe_float(season_row.get("FG_PCT")) * 100
             three_pt_percent = safe_float(season_row.get("FG3_PCT")) * 100
+            ft_percent = safe_float(season_row.get("FT_PCT")) * 100
+
+            # Volume behind those percentages, for the leaderboard minimums.
+            # A player missing from the totals response keeps his percentages
+            # and lands with zero volume, which reads as "not qualified" rather
+            # than as a bogus leader.
+            totals_row = totals_by_player_id.get(player_id)
+            games_played = safe_int(totals_row.get("GP")) if totals_row is not None else safe_int(gp)
+            fgm = safe_int(totals_row.get("FGM")) if totals_row is not None else 0
+            fga = safe_int(totals_row.get("FGA")) if totals_row is not None else 0
+            fg3m = safe_int(totals_row.get("FG3M")) if totals_row is not None else 0
+            fg3a = safe_int(totals_row.get("FG3A")) if totals_row is not None else 0
+            ftm = safe_int(totals_row.get("FTM")) if totals_row is not None else 0
+            fta = safe_int(totals_row.get("FTA")) if totals_row is not None else 0
 
             insert_player(
                 cursor,
@@ -340,7 +395,15 @@ def fetch_and_insert_players():
                     round(apg, 1),
                     round(fg_percent, 1),
                     round(three_pt_percent, 1),
+                    round(ft_percent, 1),
                     target_start_year,
+                    games_played,
+                    fgm,
+                    fga,
+                    fg3m,
+                    fg3a,
+                    ftm,
+                    fta,
                 ),
             )
 

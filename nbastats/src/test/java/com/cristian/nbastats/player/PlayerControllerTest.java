@@ -1,6 +1,10 @@
 package com.cristian.nbastats.player;
 
 import com.cristian.nbastats.config.SecurityConfig;
+import com.cristian.nbastats.player.dto.LeaderEntry;
+import com.cristian.nbastats.player.dto.LeaderboardResponse;
+import com.cristian.nbastats.player.dto.PlayerResponse;
+import com.cristian.nbastats.player.dto.QualificationInfo;
 import com.cristian.nbastats.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +13,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -128,5 +134,39 @@ class PlayerControllerTest {
     void writeEndpointsAllowAdmins() throws Exception {
         mockMvc.perform(delete("/api/v1/players/1"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void leaderboardExposesTheQualificationRuleAndTheExcludedPlayers() throws Exception {
+        when(playerService.leaderboard("three_pt_percent", 5)).thenReturn(new LeaderboardResponse(
+                "three_pt_percent",
+                new QualificationInfo(82, 58, 82, "fg3m", "minimum 58 games played and 82 made 3PT"),
+                List.of(new LeaderEntry(
+                        1, player("Volume Shooter", 40.0), 40.0, 82, 120, 300, true, null
+                )),
+                List.of(new LeaderEntry(
+                        null, player("One And Done", 100.0), 100.0, 60, 1, 1, false, "1 of 82 made 3PT"
+                ))
+        ));
+
+        mockMvc.perform(get("/api/v1/players/leaders/three_pt_percent?limit=5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.qualification.summary")
+                        .value("minimum 58 games played and 82 made 3PT"))
+                .andExpect(jsonPath("$.qualification.minMade").value(82))
+                .andExpect(jsonPath("$.leaders[0].player.name").value("Volume Shooter"))
+                .andExpect(jsonPath("$.leaders[0].rank").value(1))
+                .andExpect(jsonPath("$.leaders[0].made").value(120))
+                // The 100% shooter is present and marked, not quietly dropped.
+                .andExpect(jsonPath("$.unqualified[0].player.name").value("One And Done"))
+                .andExpect(jsonPath("$.unqualified[0].qualified").value(false))
+                .andExpect(jsonPath("$.unqualified[0].reason").value("1 of 82 made 3PT"));
+    }
+
+    private PlayerResponse player(String name, double threePtPercent) {
+        return new PlayerResponse(
+                1L, name, "BOS", "SG", 10.0, 3.0, 2.0, 45.0, threePtPercent, 80.0,
+                2025, 60, 200, 450, 1, 1, 80, 100
+        );
     }
 }

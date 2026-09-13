@@ -25,7 +25,10 @@ export function HomeClient() {
 
   const kpis = useQuery("home-kpis", async () => {
     const [ppg, rpg, apg] = await Promise.all(
-      KPI_STATS.map(async (s) => (await fetchLeaders(s.key, 1))[0]),
+      // The qualified leader, not the raw maximum: these three tiles are the
+      // first thing the site says, and they were previously happy to name a
+      // player who had played one game.
+      KPI_STATS.map(async (s) => (await fetchLeaders(s.key, 1)).leaders[0]?.player),
     );
     return { ppg, rpg, apg };
   });

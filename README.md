@@ -154,9 +154,28 @@ CREATE TABLE IF NOT EXISTS player (
     apg DOUBLE PRECISION NOT NULL,
     fg_percent DOUBLE PRECISION NOT NULL,
     three_pt_percent DOUBLE PRECISION NOT NULL,
-    season INTEGER NOT NULL
+    ft_percent DOUBLE PRECISION NOT NULL DEFAULT 0,
+    season INTEGER NOT NULL,
+    games_played INTEGER NOT NULL DEFAULT 0,
+    fgm INTEGER NOT NULL DEFAULT 0,
+    fga INTEGER NOT NULL DEFAULT 0,
+    fg3m INTEGER NOT NULL DEFAULT 0,
+    fg3a INTEGER NOT NULL DEFAULT 0,
+    ftm INTEGER NOT NULL DEFAULT 0,
+    fta INTEGER NOT NULL DEFAULT 0
 );
 ```
+
+The columns after `season` carry the volume behind the percentages. They exist
+because a percentage on its own cannot be ranked honestly: a player who made his
+only three-point attempt of the season and a player who shot 200-for-500 are both
+just `three_pt_percent`, and only the first one leads the league. See
+[Leaderboard qualification](#leaderboard-qualification).
+
+An existing database gets them from
+[`docs/migrations/001_qualification_columns.sql`](docs/migrations/001_qualification_columns.sql).
+Because `ddl-auto` is `validate`, run that migration **before** deploying a
+backend that reads the columns, or startup fails validation.
 
 The string columns are nullable at the database level; blank names, teams, and
 positions are rejected by Bean Validation in the application layer instead. The
@@ -239,7 +258,7 @@ All routes use the base path `/api/v1/players`.
 | GET | `/minPpg?minPpg=20` | Filter by minimum PPG |
 | GET | `/top-scorers?limit=10` | Top players by PPG |
 | GET | `/compare?name1=...&name2=...` | Retrieve two exact-name matches |
-| GET | `/leaders/{stat}?limit=5` | Leaders for a supported statistic |
+| GET | `/leaders/{stat}?limit=5` | Leaders for a supported statistic, qualified players ranked and the rest flagged |
 | POST | `/` | Create a player when writes are enabled |
 | PUT | `/{id}` | Update a player when writes are enabled |
 | PUT | `/` | Legacy update; requires `id` in the body |
@@ -267,7 +286,70 @@ Supported sort fields:
 - `fgPercent` or `fg_percent`
 - `threePtPercent` or `three_pt_percent`
 
-Supported leaderboard statistics are `ppg`, `rpg`, `apg`, `fgPercent`, and `threePtPercent`. Snake-case percentage aliases are also accepted.
+Supported leaderboard statistics are `ppg`, `rpg`, `apg`, `fgPercent`, `threePtPercent`, and `ftPercent`. Snake-case percentage aliases are also accepted.
+
+### Leaderboard qualification
+
+`GET /leaders/{stat}` ranks only players meeting the NBA's published
+[statistical minimums](https://www.nba.com/stats/help/statminimums):
+
+| Category | Minimum |
+| --- | --- |
+| `ppg`, `rpg`, `apg` | 58 games played |
+| `fgPercent` | 58 games and 300 made field goals |
+| `threePtPercent` | 58 games and 82 made three-pointers |
+| `ftPercent` | 58 games and 125 made free throws |
+
+Those are the figures for a completed 82-game season. Mid-season they are
+prorated against the games the furthest-along team has played, so twenty games
+in, the three-point minimum is twenty made threes rather than eighty-two. The
+NBA's own note that 82 makes means "an average of 1 per team game" is the reason
+these are treated as rates rather than constants.
+
+Players who miss the cut are returned in `unqualified` rather than dropped, each
+with the reason, so a dashboard can show them flagged instead of pretending they
+do not exist:
+
+```json
+{
+  "stat": "three_pt_percent",
+  "qualification": {
+    "leagueGamesPlayed": 82,
+    "minGamesPlayed": 58,
+    "minMade": 82,
+    "madeStat": "fg3m",
+    "summary": "minimum 58 games played and 82 made 3PT"
+  },
+  "leaders": [
+    {
+      "rank": 1,
+      "player": { "id": 12081, "name": "...", "three_pt_percent": 43.9, "...": "..." },
+      "value": 43.9,
+      "gamesPlayed": 77,
+      "made": 197,
+      "attempted": 449,
+      "qualified": true,
+      "reason": null
+    }
+  ],
+  "unqualified": [
+    {
+      "rank": null,
+      "player": { "id": 12140, "name": "...", "three_pt_percent": 100.0, "...": "..." },
+      "value": 100.0,
+      "gamesPlayed": 60,
+      "made": 1,
+      "attempted": 1,
+      "qualified": false,
+      "reason": "1 of 82 made 3PT"
+    }
+  ]
+}
+```
+
+Until the loader has run against a table with the volume columns, every
+`games_played` is the column default of `0`, every prorated minimum is `0`, and
+every player qualifies. The rule turns itself on with the first real refresh.
 
 ### Player request example
 
@@ -284,6 +366,10 @@ Supported leaderboard statistics are `ppg`, `rpg`, `apg`, `fgPercent`, and `thre
   "season": 2023
 }
 ```
+
+Writes set the rate stats only. The volume columns are the loader's to populate,
+so a player created through the API has zero games and zero makes, and is not
+eligible for a leaderboard until a refresh gives it real numbers.
 
 Names and teams cannot be blank, stats cannot be negative, percentages must be between 0 and 100, and positions must use NBA position abbreviations.
 

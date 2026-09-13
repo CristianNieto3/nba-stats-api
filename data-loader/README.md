@@ -1,8 +1,23 @@
 # data-loader
 
 Rebuilds the `player` table in Supabase from `stats.nba.com`. One run costs
-~31 HTTP requests (one `LeagueDashPlayerStats` plus 30 `CommonTeamRoster`) and
+~32 HTTP requests (two `LeagueDashPlayerStats` plus 30 `CommonTeamRoster`) and
 takes about two minutes.
+
+The two `LeagueDashPlayerStats` calls request the same season twice, once in
+`PerGame` mode for the rate stats and once in `Totals` mode for the makes,
+attempts, and games played behind them. Totals could be recovered by multiplying
+the per-game figures by `GP`, but the leaderboard minimums are counted in whole
+made shots -- 82 threes, 300 field goals -- and multiplying a rounded average
+puts players either side of that line. One extra league-wide request is cheap
+next to the 30 roster calls already in the run.
+
+> **Requires the volume columns.** This loader writes `games_played`, `fgm`,
+> `fga`, `fg3m`, `fg3a`, `ftm`, `fta`, and `ft_percent`. Against a table that
+> predates them the `INSERT` fails and the transaction rolls back, leaving the
+> old data in place. Apply
+> [`../docs/migrations/001_qualification_columns.sql`](../docs/migrations/001_qualification_columns.sql)
+> first.
 
 | File | Role |
 |---|---|
@@ -100,6 +115,23 @@ ping URL to close it. The script pings `/start` before, the bare URL on success,
 and `/fail` with a log tail on failure; the service emails you when an expected
 ping does not arrive. Without it, a laptop that stays shut for a week is
 indistinguishable from a week of successful runs.
+
+### A run killed from outside
+
+A killed process never reaches its `finally` block, so `LAST_RUN.txt` is not
+written. It just keeps showing the last run that finished. The task's
+`LastTaskResult` says what killed it:
+
+- `0xC000013A` (3221225786): a console control event. Something pressed Ctrl+C
+  or closed the console.
+- `0x00041306`: Task Scheduler stopped the task (time limit, or `Stop-ScheduledTask`).
+
+An Interactive task normally opens a visible console, which on Windows 11 is a
+Windows Terminal tab that can be closed by accident. Runs failed with
+`0xC000013A` from 2026-08-29 to 2026-09-13 while the script, config and task
+settings were all fine. `register_task.ps1` therefore launches PowerShell through
+`conhost.exe --headless`, so no console window exists. Re-run it after pulling
+this change so the existing task picks up the new action.
 
 ## Cadence
 
