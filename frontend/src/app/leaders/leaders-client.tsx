@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchLeaders } from "@/lib/api";
 import { perGame, percent, teamCode } from "@/lib/format";
-import { STATS, statValue, type StatKey } from "@/lib/types";
+import { STATS, type StatKey } from "@/lib/types";
 import { useQuery } from "@/lib/use-query";
 import { ErrorState, TableSkeleton } from "@/components/states";
 import { MagnitudeBar } from "@/components/magnitude-bar";
@@ -30,8 +30,9 @@ export function LeadersClient() {
 
   const meta = STATS.find((s) => s.key === stat)!;
   const result = useQuery(`leaders-${stat}-${limit}`, () => fetchLeaders(stat, Number(limit)));
-  const leaders = result.data;
-  const max = leaders?.[0] ? statValue(leaders[0], stat) : 0;
+  const board = result.data;
+  // Anchored on the qualified leader, so a 1-for-1 season cannot set the scale.
+  const max = board?.leaders[0]?.value ?? 0;
 
   return (
     <div className="max-w-4xl">
@@ -74,10 +75,24 @@ export function LeadersClient() {
         </label>
       </div>
 
+      {board && (
+        <p className="mt-3 text-[13px] text-ink-2">
+          Ranked over players meeting the NBA minimum: {board.qualification.summary}.{" "}
+          <a
+            href="https://www.nba.com/stats/help/statminimums"
+            target="_blank"
+            rel="noreferrer"
+            className="underline decoration-hairline underline-offset-2 hover:text-accent transition-colors"
+          >
+            Rules
+          </a>
+        </p>
+      )}
+
       <div className="mt-5">
         {result.loading && <TableSkeleton rows={Number(limit) > 25 ? 25 : Number(limit)} />}
         {result.error && <ErrorState error={result.error} retry={result.retry} />}
-        {leaders && (
+        {board && (
           <div
             className={`border border-hairline rounded-md bg-surface overflow-x-auto ${
               result.refetching ? "refetching" : ""
@@ -89,7 +104,7 @@ export function LeadersClient() {
                 accent; everyone else the de-emphasis gray. */}
             <table className="w-full text-[15px]">
               <caption className="sr-only">
-                Top {limit} players by {meta.long}
+                Top {limit} qualified players by {meta.long}
               </caption>
               <thead>
                 <tr className="border-b border-hairline">
@@ -105,6 +120,11 @@ export function LeadersClient() {
                   <th scope="col" className="section-label text-left px-3 py-2.5 w-36 max-md:hidden">
                     Position
                   </th>
+                  {meta.percent && (
+                    <th scope="col" className="section-label text-right px-3 py-2.5 w-28 max-md:hidden">
+                      Made
+                    </th>
+                  )}
                   <th scope="col" className="section-label text-right px-3 py-2.5 w-20">
                     {meta.label}
                   </th>
@@ -114,26 +134,31 @@ export function LeadersClient() {
                 </tr>
               </thead>
               <tbody>
-                {leaders.map((player, index) => (
-                  <tr key={player.id} className="row-interactive border-b border-hairline last:border-b-0">
-                    <td className="px-3 py-2.5 text-right tnum text-ink-2">{index + 1}</td>
+                {board.leaders.map((entry, index) => (
+                  <tr key={entry.player.id} className="row-interactive border-b border-hairline last:border-b-0">
+                    <td className="px-3 py-2.5 text-right tnum text-ink-2">{entry.rank}</td>
                     <td className="px-3 py-2.5">
                       <Link
-                        href={`/players/${player.id}`}
+                        href={`/players/${entry.player.id}`}
                         className={`font-medium hover:text-accent transition-colors ${
                           index === 0 ? "text-accent" : "text-ink"
                         }`}
                       >
-                        {player.name}
+                        {entry.player.name}
                       </Link>
                     </td>
-                    <td className="px-3 py-2.5 text-ink-2">{teamCode(player.team)}</td>
-                    <td className="px-3 py-2.5 text-ink-2 max-md:hidden">{player.position}</td>
+                    <td className="px-3 py-2.5 text-ink-2">{teamCode(entry.player.team)}</td>
+                    <td className="px-3 py-2.5 text-ink-2 max-md:hidden">{entry.player.position}</td>
+                    {meta.percent && (
+                      <td className="px-3 py-2.5 text-right tnum text-ink-2 max-md:hidden">
+                        {entry.made}-for-{entry.attempted}
+                      </td>
+                    )}
                     <td className="px-3 py-2.5 text-right tnum font-medium">
-                      {meta.percent ? percent(statValue(player, stat)) : perGame(statValue(player, stat))}
+                      {meta.percent ? percent(entry.value) : perGame(entry.value)}
                     </td>
                     <td className="px-3 py-2.5 max-sm:hidden">
-                      <MagnitudeBar value={statValue(player, stat)} max={max} emphasized={index === 0} />
+                      <MagnitudeBar value={entry.value} max={max} emphasized={index === 0} />
                     </td>
                   </tr>
                 ))}
@@ -142,6 +167,60 @@ export function LeadersClient() {
           </div>
         )}
       </div>
+
+      {/* The excluded players, kept visible rather than dropped. A board that
+          silently loses the name someone saw yesterday reads as a bug; one that
+          says why it lost them reads as a rule. */}
+      {board && board.unqualified.length > 0 && (
+        <section className="mt-9">
+          <h2 className="section-label">Did not qualify</h2>
+          <p className="mt-1.5 text-[13px] text-ink-2">
+            A higher {meta.label} than the players above, on too little volume to rank.
+          </p>
+          <div className="mt-3 border border-hairline rounded-md bg-surface overflow-x-auto">
+            <table className="w-full text-[15px]">
+              <caption className="sr-only">
+                Players excluded from the {meta.long} leaderboard, with the reason
+              </caption>
+              <thead>
+                <tr className="border-b border-hairline">
+                  <th scope="col" className="section-label text-left px-3 py-2.5">
+                    Player
+                  </th>
+                  <th scope="col" className="section-label text-left px-3 py-2.5 w-16">
+                    Team
+                  </th>
+                  <th scope="col" className="section-label text-right px-3 py-2.5 w-20">
+                    {meta.label}
+                  </th>
+                  <th scope="col" className="section-label text-left px-3 py-2.5 w-[45%] max-sm:hidden">
+                    Short of
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {board.unqualified.map((entry) => (
+                  <tr key={entry.player.id} className="row-interactive border-b border-hairline last:border-b-0">
+                    <td className="px-3 py-2.5">
+                      <Link
+                        href={`/players/${entry.player.id}`}
+                        className="font-medium text-ink-2 hover:text-accent transition-colors"
+                      >
+                        {entry.player.name}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2.5 text-ink-2">{teamCode(entry.player.team)}</td>
+                    <td className="px-3 py-2.5 text-right tnum text-ink-2">
+                      {meta.percent ? percent(entry.value) : perGame(entry.value)}
+                    </td>
+                    <td className="px-3 py-2.5 text-ink-2 text-[13px] max-sm:hidden">{entry.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -8,7 +8,49 @@ export type Player = {
   apg: number;
   fg_percent: number;
   three_pt_percent: number;
+  ft_percent: number;
   season: number;
+  /** Volume behind the percentages, so "36.6%" can be shown as "1-for-1". */
+  games_played: number;
+  fgm: number;
+  fga: number;
+  fg3m: number;
+  fg3a: number;
+  ftm: number;
+  fta: number;
+};
+
+/**
+ * The thresholds a leaderboard was built with. The API returns them so the page
+ * can print the rule rather than silently dropping players from the table.
+ */
+export type Qualification = {
+  leagueGamesPlayed: number;
+  minGamesPlayed: number;
+  /** Null for per-game stats, which carry no made-shot requirement. */
+  minMade: number | null;
+  madeStat: string | null;
+  summary: string;
+};
+
+export type LeaderEntry = {
+  /** Null when the player did not qualify. */
+  rank: number | null;
+  player: Player;
+  value: number;
+  gamesPlayed: number;
+  made: number | null;
+  attempted: number | null;
+  qualified: boolean;
+  /** Why they missed, null when they qualified. */
+  reason: string | null;
+};
+
+export type Leaderboard = {
+  stat: string;
+  qualification: Qualification;
+  leaders: LeaderEntry[];
+  unqualified: LeaderEntry[];
 };
 
 export type ApiErrorBody = {
