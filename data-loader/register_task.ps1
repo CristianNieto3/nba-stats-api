@@ -19,6 +19,16 @@
                               to kill a running task when the charger comes out.
       ExecutionTimeLimit      a hung stats.nba.com request should not leave a
                               python process alive indefinitely.
+      Headless console        the action starts PowerShell through
+                              `conhost.exe --headless`. Otherwise an Interactive
+                              task opens a visible console (a Windows Terminal
+                              tab on Windows 11), and closing it or pressing
+                              Ctrl+C kills the run with 0xC000013A before
+                              LAST_RUN.txt is written. Runs failed exactly
+                              that way from 2026-08-29 to 2026-09-13. Stopping
+                              the task through Task Scheduler reports
+                              0x00041306 instead, so the code identifies a
+                              console event.
 
 .PARAMETER Time
     Local time to run daily. Default 06:30, comfortably after even the latest
@@ -52,9 +62,10 @@ if ($Unregister) {
 
 if (-not (Test-Path $Runner)) { throw "run_refresh.ps1 not found next to this script ($Runner)" }
 
+$PowerShellExe = Join-Path $PSHOME 'powershell.exe'
 $action = New-ScheduledTaskAction `
-    -Execute (Join-Path $PSHOME 'powershell.exe') `
-    -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Runner`"" `
+    -Execute (Join-Path $env:SystemRoot 'System32\conhost.exe') `
+    -Argument "--headless `"$PowerShellExe`" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Runner`"" `
     -WorkingDirectory $LoaderDir
 
 $trigger = New-ScheduledTaskTrigger -Daily -At $Time
