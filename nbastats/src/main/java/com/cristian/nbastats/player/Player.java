@@ -36,6 +36,22 @@ public class Player {
 
     private int season;
 
+    // Volume behind the percentages. The percentage columns alone cannot
+    // distinguish 1-for-1 from 200-for-500, which is what the NBA's leaderboard
+    // minimums are written in terms of; see QualificationRules.
+    @Column(name = "games_played")
+    private int gamesPlayed;
+
+    private int fgm;
+    private int fga;
+    private int fg3m;
+    private int fg3a;
+    private int ftm;
+    private int fta;
+
+    @Column(name = "ft_percent")
+    private double ftPercent;
+
     public Player() {
     }
 
@@ -51,6 +67,20 @@ public class Player {
         this.fgPercent = fgPercent;
         this.threePtPercent = threePtPercent;
         this.season = season;
+    }
+
+    public Player(Long id, String name, String team, String position,
+                  double ppg, double rpg, double apg, double fgPercent, double threePtPercent, int season,
+                  int gamesPlayed, int fgm, int fga, int fg3m, int fg3a, int ftm, int fta, double ftPercent) {
+        this(id, name, team, position, ppg, rpg, apg, fgPercent, threePtPercent, season);
+        this.gamesPlayed = gamesPlayed;
+        this.fgm = fgm;
+        this.fga = fga;
+        this.fg3m = fg3m;
+        this.fg3a = fg3a;
+        this.ftm = ftm;
+        this.fta = fta;
+        this.ftPercent = ftPercent;
     }
 
     public Long getId() {
@@ -131,5 +161,69 @@ public class Player {
 
     public void setSeason(int season) {
         this.season = season;
+    }
+
+    public int getGamesPlayed() {
+        return gamesPlayed;
+    }
+
+    public void setGamesPlayed(int gamesPlayed) {
+        this.gamesPlayed = gamesPlayed;
+    }
+
+    public int getFgm() {
+        return fgm;
+    }
+
+    public void setFgm(int fgm) {
+        this.fgm = fgm;
+    }
+
+    public int getFga() {
+        return fga;
+    }
+
+    public void setFga(int fga) {
+        this.fga = fga;
+    }
+
+    public int getFg3m() {
+        return fg3m;
+    }
+
+    public void setFg3m(int fg3m) {
+        this.fg3m = fg3m;
+    }
+
+    public int getFg3a() {
+        return fg3a;
+    }
+
+    public void setFg3a(int fg3a) {
+        this.fg3a = fg3a;
+    }
+
+    public int getFtm() {
+        return ftm;
+    }
+
+    public void setFtm(int ftm) {
+        this.ftm = ftm;
+    }
+
+    public int getFta() {
+        return fta;
+    }
+
+    public void setFta(int fta) {
+        this.fta = fta;
+    }
+
+    public double getFtPercent() {
+        return ftPercent;
+    }
+
+    public void setFtPercent(double ftPercent) {
+        this.ftPercent = ftPercent;
     }
 }

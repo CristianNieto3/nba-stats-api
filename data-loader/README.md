@@ -1,8 +1,23 @@
 # data-loader
 
 Rebuilds the `player` table in Supabase from `stats.nba.com`. One run costs
-~31 HTTP requests (one `LeagueDashPlayerStats` plus 30 `CommonTeamRoster`) and
+~32 HTTP requests (two `LeagueDashPlayerStats` plus 30 `CommonTeamRoster`) and
 takes about two minutes.
+
+The two `LeagueDashPlayerStats` calls request the same season twice, once in
+`PerGame` mode for the rate stats and once in `Totals` mode for the makes,
+attempts, and games played behind them. Totals could be recovered by multiplying
+the per-game figures by `GP`, but the leaderboard minimums are counted in whole
+made shots -- 82 threes, 300 field goals -- and multiplying a rounded average
+puts players either side of that line. One extra league-wide request is cheap
+next to the 30 roster calls already in the run.
+
+> **Requires the volume columns.** This loader writes `games_played`, `fgm`,
+> `fga`, `fg3m`, `fg3a`, `ftm`, `fta`, and `ft_percent`. Against a table that
+> predates them the `INSERT` fails and the transaction rolls back, leaving the
+> old data in place. Apply
+> [`../docs/migrations/001_qualification_columns.sql`](../docs/migrations/001_qualification_columns.sql)
+> first.
 
 | File | Role |
 |---|---|

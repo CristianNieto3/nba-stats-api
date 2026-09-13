@@ -44,12 +44,24 @@ ABSOLUTE_FLOOR = 300
 # percentage for ~89%, so these floors sit well below anything legitimate.
 # three_pt_percent gets the loosest floor because plenty of centres never
 # attempt one.
+# The volume columns get deliberately loose floors. They exist to catch a
+# column that came back entirely zero, not to police a plausible distribution:
+# plenty of centres never make a three, and a floor tight enough to be
+# interesting is a floor that fails a legitimate refresh.
 MIN_NONZERO_RATIO = {
     "ppg": 0.50,
     "rpg": 0.50,
     "apg": 0.50,
     "fg_percent": 0.50,
     "three_pt_percent": 0.25,
+    "ft_percent": 0.50,
+    "games_played": 0.95,
+    "fgm": 0.80,
+    "fga": 0.80,
+    "fg3m": 0.25,
+    "fg3a": 0.25,
+    "ftm": 0.50,
+    "fta": 0.50,
 }
 
 # The other direction. The loader multiplies FG_PCT and FG3_PCT by 100 because
@@ -62,7 +74,29 @@ MAX_PLAUSIBLE = {
     "apg": 25.0,
     "fg_percent": 100.0,
     "three_pt_percent": 100.0,
+    "ft_percent": 100.0,
+    # 82 games, and season records with room over them: 402 threes (Curry),
+    # 1597 field goals (Chamberlain), 840 free throws (Harden).
+    "games_played": 82,
+    "fgm": 1600.0,
+    "fga": 3200.0,
+    "fg3m": 500.0,
+    "fg3a": 1300.0,
+    "ftm": 900.0,
+    "fta": 1200.0,
 }
+
+# Relationships that hold in every real box score. These catch the failure the
+# ratio checks cannot see: the loader writes its columns positionally, and a
+# 17-placeholder INSERT with two values transposed produces a table where every
+# column is populated, every ratio passes, and the numbers are quietly wrong.
+CONSISTENCY_CHECKS = (
+    ("fgm > fga", "made more field goals than they attempted"),
+    ("fg3m > fg3a", "made more threes than they attempted"),
+    ("ftm > fta", "made more free throws than they attempted"),
+    ("fg3m > fgm", "made more threes than field goals -- a three is a field goal"),
+    ("games_played > 82", "played more than 82 games"),
+)
 
 # Somebody always leads the league by a distance. If the best scorer in the
 # table is under this, the stats did not load, whatever the per-column ratios
@@ -133,6 +167,13 @@ def main():
                 c: {"nonzero": stat_row[i * 2], "max": stat_row[i * 2 + 1]}
                 for i, c in enumerate(STAT_COLUMNS)
             }
+
+            inconsistent = []
+            for predicate, description in CONSISTENCY_CHECKS:
+                cur.execute(f"SELECT count(*) FROM player WHERE {predicate};")
+                offenders = cur.fetchone()[0]
+                if offenders:
+                    inconsistent.append((offenders, description))
     finally:
         conn.close()
 
@@ -179,6 +220,12 @@ def main():
                     f"{column} reaches {largest:g}, above the plausible maximum of "
                     f"{ceiling:g} -- check whether the source changed scale"
                 )
+
+        for offenders, description in inconsistent:
+            failures.append(
+                f"{offenders} rows {description} -- the volume columns are most "
+                "likely misaligned with the INSERT that wrote them"
+            )
 
         best_ppg = stats["ppg"]["max"] or 0.0
         if best_ppg < MIN_LEAGUE_MAX_PPG:

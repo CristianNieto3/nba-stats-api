@@ -1,5 +1,6 @@
 package com.cristian.nbastats.player;
 
+import com.cristian.nbastats.player.dto.LeaderboardResponse;
 import com.cristian.nbastats.player.dto.PlayerResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,6 +98,59 @@ class PlayerServiceTest {
         assertThat(leaders)
                 .extracting(PlayerResponse::name)
                 .containsExactly("Anthony Davis", "LeBron James");
+    }
+
+    @Test
+    void leaderboardRanksOnlyPlayersMeetingTheNbaMinimums() {
+        playerRepository.saveAll(List.of(
+                // 40% on real volume, and a centre who took one three all year.
+                shooter("Volume Shooter", 82, 120, 300),
+                shooter("One And Done", 60, 1, 1)
+        ));
+
+        LeaderboardResponse board = playerService.leaderboard("three_pt_percent", 5);
+
+        assertThat(board.qualification().minGamesPlayed()).isEqualTo(58);
+        assertThat(board.qualification().minMade()).isEqualTo(82);
+        assertThat(board.leaders())
+                .extracting(entry -> entry.player().name())
+                .containsExactly("Volume Shooter");
+    }
+
+    @Test
+    void leaderboardReturnsExcludedPlayersWithTheReasonTheyMissed() {
+        playerRepository.saveAll(List.of(
+                shooter("Volume Shooter", 82, 120, 300),
+                shooter("One And Done", 60, 1, 1)
+        ));
+
+        LeaderboardResponse board = playerService.leaderboard("three_pt_percent", 5);
+
+        // The 100% shooter is the top of the unqualified list, not missing.
+        assertThat(board.unqualified()).first().satisfies(entry -> {
+            assertThat(entry.player().name()).isEqualTo("One And Done");
+            assertThat(entry.value()).isEqualTo(100.0);
+            assertThat(entry.rank()).isNull();
+            assertThat(entry.qualified()).isFalse();
+            assertThat(entry.made()).isEqualTo(1);
+            assertThat(entry.attempted()).isEqualTo(1);
+            assertThat(entry.reason()).contains("1 of 82 made 3PT");
+        });
+    }
+
+    @Test
+    void leaderboardRejectsUnknownStats() {
+        assertThatThrownBy(() -> playerService.leaderboard("steals", 5))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unsupported stat");
+    }
+
+    private Player shooter(String name, int gamesPlayed, int fg3m, int fg3a) {
+        double threePtPercent = fg3a == 0 ? 0.0 : fg3m * 100.0 / fg3a;
+        return new Player(
+                null, name, "BOS", "SG", 10.0, 3.0, 2.0, 45.0, threePtPercent, 2023,
+                gamesPlayed, 200, 450, fg3m, fg3a, 80, 100, 80.0
+        );
     }
 
     private Player player(
