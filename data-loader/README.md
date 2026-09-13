@@ -116,6 +116,23 @@ and `/fail` with a log tail on failure; the service emails you when an expected
 ping does not arrive. Without it, a laptop that stays shut for a week is
 indistinguishable from a week of successful runs.
 
+### A run killed from outside
+
+A killed process never reaches its `finally` block, so `LAST_RUN.txt` is not
+written. It just keeps showing the last run that finished. The task's
+`LastTaskResult` says what killed it:
+
+- `0xC000013A` (3221225786): a console control event. Something pressed Ctrl+C
+  or closed the console.
+- `0x00041306`: Task Scheduler stopped the task (time limit, or `Stop-ScheduledTask`).
+
+An Interactive task normally opens a visible console, which on Windows 11 is a
+Windows Terminal tab that can be closed by accident. Runs failed with
+`0xC000013A` from 2026-08-29 to 2026-09-13 while the script, config and task
+settings were all fine. `register_task.ps1` therefore launches PowerShell through
+`conhost.exe --headless`, so no console window exists. Re-run it after pulling
+this change so the existing task picks up the new action.
+
 ## Cadence
 
 Daily at 06:30 local, after even the latest West Coast game has gone final.
