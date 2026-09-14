@@ -8,7 +8,7 @@ import com.cristian.nbastats.player.dto.QualificationInfo;
 import com.cristian.nbastats.error.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -72,6 +73,55 @@ class PlayerControllerTest {
                 .andExpect(jsonPath("$.fieldErrors.position").exists())
                 .andExpect(jsonPath("$.fieldErrors.ppg").exists())
                 .andExpect(jsonPath("$.fieldErrors.fgPercent").exists());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void createPlayerRejectsNullPpgAsMalformed() throws Exception {
+        mockMvc.perform(post("/api/v1/players")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "name": "Test Player",
+                                  "team": "LAL",
+                                  "position": "PG",
+                                  "ppg": null,
+                                  "rpg": 5,
+                                  "apg": 4,
+                                  "fg_percent": 45,
+                                  "three_pt_percent": 36,
+                                  "season": 2025
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Request body is malformed or contains an invalid value."));
+
+        verifyNoInteractions(playerService);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void createPlayerRejectsOmittedPpgAsMalformed() throws Exception {
+        mockMvc.perform(post("/api/v1/players")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "name": "Test Player",
+                                  "team": "LAL",
+                                  "position": "PG",
+                                  "rpg": 5,
+                                  "apg": 4,
+                                  "fg_percent": 45,
+                                  "three_pt_percent": 36,
+                                  "season": 2025
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("Request body is malformed or contains an invalid value."));
+
+        verifyNoInteractions(playerService);
     }
 
     @Test
