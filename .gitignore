@@ -14,3 +14,5 @@ data-loader/config.ps1
 data-loader/.env
 data-loader/venv/
 data-loader/__pycache__/
+data-loader/tests/__pycache__/
+data-loader/.pytest_cache/

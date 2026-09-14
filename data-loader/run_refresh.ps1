@@ -113,20 +113,37 @@ try {
     $script:RowsBefore = (& $VenvPy (Join-Path $LoaderDir 'verify_player_table.py') --print-count) | Select-Object -Last 1
     if ($LASTEXITCODE -ne 0) { throw "Could not read the current row count (exit $LASTEXITCODE). Database unreachable?" }
     Write-Output "  rows before: $script:RowsBefore"
+    $seasonBefore = (& $VenvPy (Join-Path $LoaderDir 'verify_player_table.py') --print-season) | Select-Object -Last 1
+    if ($LASTEXITCODE -ne 0) { throw "Could not read the current season (exit $LASTEXITCODE)." }
+    Push-Location $LoaderDir
+    try {
+        $targetSeason = & $VenvPy -c 'from load_nba_players import get_current_nba_season_start_year; print(get_current_nba_season_start_year())'
+        if ($LASTEXITCODE -ne 0) { throw "Could not determine the target season." }
+    } finally { Pop-Location }
+    Write-Output "  season before: $seasonBefore; target: $targetSeason"
 
     Write-Step "Running the loader"
     & $VenvPy (Join-Path $LoaderDir 'load_nba_players.py')
-    if ($LASTEXITCODE -ne 0) { throw "Loader exited $LASTEXITCODE. The table was rolled back and is unchanged." }
+    if ($LASTEXITCODE -eq 3) {
+        $script:Outcome = 'SKIP'
+        $script:Detail = "season not started; kept $seasonBefore ($script:RowsBefore rows)"
+        Write-Step $script:Detail
+    } else {
+        if ($LASTEXITCODE -ne 0) { throw "Loader exited $LASTEXITCODE. The table was rolled back and is unchanged." }
 
-    Write-Step "Verifying what actually landed"
-    & $VenvPy (Join-Path $LoaderDir 'verify_player_table.py') --min-rows $script:RowsBefore
-    if ($LASTEXITCODE -ne 0) { throw "Post-load verification failed (exit $LASTEXITCODE)." }
+        Write-Step "Verifying what actually landed"
+        $verifyArgs = @('--expect-season', $targetSeason)
+        if ($seasonBefore -eq $targetSeason) { $verifyArgs += @('--min-rows', $script:RowsBefore) }
+        & $VenvPy (Join-Path $LoaderDir 'verify_player_table.py') @verifyArgs
+        if ($LASTEXITCODE -ne 0) { throw "Post-load verification failed (exit $LASTEXITCODE)." }
 
-    $script:RowsAfter = (& $VenvPy (Join-Path $LoaderDir 'verify_player_table.py') --print-count) | Select-Object -Last 1
+        $script:RowsAfter = (& $VenvPy (Join-Path $LoaderDir 'verify_player_table.py') --print-count) | Select-Object -Last 1
+        if ($LASTEXITCODE -ne 0) { throw "Could not read the post-load row count (exit $LASTEXITCODE)." }
 
-    $script:Outcome = 'OK'
-    $script:Detail  = "rows $script:RowsBefore -> $script:RowsAfter"
-    Write-Step "Refresh succeeded ($script:Detail)"
+        $script:Outcome = 'OK'
+        $script:Detail  = "rows $script:RowsBefore -> $script:RowsAfter"
+        Write-Step "Refresh succeeded ($script:Detail)"
+    }
 }
 catch {
     $script:Outcome = 'FAIL'
@@ -152,7 +169,7 @@ finally {
     ) -join [Environment]::NewLine
     Set-Content -Path $StatusFile -Value $status -Encoding utf8
 
-    if ($script:Outcome -eq 'OK') {
+    if ($script:Outcome -in @('OK', 'SKIP')) {
         Invoke-Healthcheck
     } else {
         $tail = ''
@@ -168,5 +185,5 @@ finally {
         Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-if ($script:Outcome -ne 'OK') { exit 1 }
+if ($script:Outcome -eq 'FAIL') { exit 1 }
 exit 0
