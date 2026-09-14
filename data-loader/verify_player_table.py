@@ -1,8 +1,8 @@
 """
 Independent post-load check on the player table.
 
-The loader has its own guard (it rolls back if the new table would be under 90%
-of the previous one), but that guard runs inside the loader's own transaction
+The loader has its own guards (a 300-row floor and a 90% ratio within the same
+season), but those guards run inside the loader's own transaction
 and trusts the loader's own bookkeeping. This script reconnects from scratch and
 looks at what actually landed, so a run that reported success while committing
 nothing -- or committing to the wrong database -- fails loudly instead of
@@ -24,13 +24,12 @@ import sys
 
 import psycopg2
 
+from load_nba_players import ABSOLUTE_FLOOR, get_current_nba_season_start_year
+
 REQUIRED_ENV = ("NBA_DB_HOST", "NBA_DB_PORT", "NBA_DB_NAME", "NBA_DB_USER", "NBA_DB_PASSWORD")
 
 # Matches the loader's own MIN_ROWS_RATIO_VS_PREVIOUS.
 MIN_ROWS_RATIO = 0.9
-# A table this small is never a real refresh, whatever the ratio says. It also
-# closes the hole where a previously-empty table makes the ratio check vacuous.
-ABSOLUTE_FLOOR = 300
 
 # Everything above counts rows. None of it looks at what is IN them, and the
 # loader's most likely failure does not change the row count at all: it reads
@@ -125,6 +124,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--print-count", action="store_true",
                         help="Print the current row count and exit 0. Used to snapshot before a load.")
+    parser.add_argument("--print-season", action="store_true",
+                        help="Print max(season), or empty for an empty table, and exit 0.")
     parser.add_argument("--min-rows", type=int,
                         help="Row count from before the load; the table must not shrink below 90%% of it.")
     parser.add_argument("--expect-season", type=int,
@@ -132,17 +133,18 @@ def main():
                              "the loader itself would target, so the two can never disagree.")
     args = parser.parse_args()
 
-    if args.expect_season is None and not args.print_count:
-        # Imported rather than reimplemented: a second copy of the "season starts
-        # in October" rule would drift from the loader's copy at the rollover,
-        # which is the one moment it has to be right. The import prints the
-        # loader's two banner lines as a side effect; that noise is harmless.
-        from load_nba_players import get_current_nba_season_start_year
+    if args.expect_season is None and not (args.print_count or args.print_season):
         args.expect_season = get_current_nba_season_start_year()
 
     conn = connect()
     try:
         with conn.cursor() as cur:
+            if args.print_season:
+                cur.execute("SELECT max(season) FROM player;")
+                season = cur.fetchone()[0]
+                print(season if season is not None else "")
+                return
+
             cur.execute("SELECT count(*) FROM player;")
             rows = cur.fetchone()[0]
 

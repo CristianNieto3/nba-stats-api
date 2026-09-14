@@ -7,6 +7,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 class QualificationRulesTest {
 
     @Test
+    void oneGameMinimumsIncludeTheSingleMadeThreeEdge() {
+        assertThat(QualificationRules.prorate(QualificationRules.MIN_GAMES_PLAYED, 1)).isEqualTo(1);
+        assertThat(QualificationRules.prorate(QualificationRules.MIN_THREE_POINTERS_MADE, 1)).isEqualTo(1);
+        assertThat(QualificationRules.prorate(QualificationRules.MIN_FIELD_GOALS_MADE, 1)).isEqualTo(4);
+        assertThat(QualificationRules.prorate(QualificationRules.MIN_FREE_THROWS_MADE, 1)).isEqualTo(2);
+    }
+
+    @Test
+    void fourGamesMinimumsRoundUp() {
+        assertThat(QualificationRules.prorate(QualificationRules.MIN_GAMES_PLAYED, 4)).isEqualTo(3);
+        assertThat(QualificationRules.prorate(QualificationRules.MIN_THREE_POINTERS_MADE, 4)).isEqualTo(4);
+        assertThat(QualificationRules.prorate(QualificationRules.MIN_FIELD_GOALS_MADE, 4)).isEqualTo(15);
+        assertThat(QualificationRules.prorate(QualificationRules.MIN_FREE_THROWS_MADE, 4)).isEqualTo(7);
+    }
+
+    @Test
     void aCompletedSeasonReproducesThePublishedMinimums() {
         // The point of storing 82-game totals and prorating them: at a full
         // season the arithmetic has to land exactly on the NBA's numbers, not
