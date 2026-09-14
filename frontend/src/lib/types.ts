@@ -73,13 +73,14 @@ export type PageResponse<T> = {
   last: boolean;
 };
 
-/** The five stats the API can rank and the labels the UI uses for them. */
+/** The six stats the API can rank and the labels the UI uses for them. */
 export const STATS = [
   { key: "ppg", label: "PPG", long: "Points per game", percent: false },
   { key: "rpg", label: "RPG", long: "Rebounds per game", percent: false },
   { key: "apg", label: "APG", long: "Assists per game", percent: false },
   { key: "fgPercent", label: "FG%", long: "Field-goal percentage", percent: true },
   { key: "threePtPercent", label: "3P%", long: "Three-point percentage", percent: true },
+  { key: "ftPercent", label: "FT%", long: "Free-throw percentage", percent: true },
 ] as const;
 
 export type StatKey = (typeof STATS)[number]["key"];
@@ -97,6 +98,8 @@ export function statValue(player: Player, stat: StatKey): number {
       return player.fg_percent;
     case "threePtPercent":
       return player.three_pt_percent;
+    case "ftPercent":
+      return player.ft_percent;
   }
 }
 

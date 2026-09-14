@@ -39,7 +39,7 @@ export function LeadersClient() {
       <h1 className="font-display font-bold uppercase tracking-wide text-3xl text-ink">Leaders</h1>
 
       <div className="mt-5 flex flex-wrap items-end gap-x-6 gap-y-3">
-        {/* Stat selector — the five stats the API can rank, nothing more. */}
+        {/* Stat selector — the six stats the API can rank, nothing more. */}
         <div role="group" aria-label="Statistic" className="flex border border-hairline rounded-sm overflow-hidden">
           {STATS.map((s) => {
             const active = s.key === stat;

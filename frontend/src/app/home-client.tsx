@@ -58,7 +58,7 @@ export function HomeClient() {
         </h1>
         <p className="mt-2 text-[16px] text-ink-2">
           {playerCount.data === null ? "" : `${playerCount.data} players. `}
-          Five stats each. Filter the roster, rank the leaders, or put two players
+          Six stats each. Filter the roster, rank the leaders, or put two players
           side by side.
         </p>
         <div className="mt-5 max-w-md">
@@ -139,7 +139,7 @@ export function HomeClient() {
         {(
           [
             ["/players", "Players", "Filter and sort the full roster."],
-            ["/leaders", "Leaders", "Ranked leaderboards for all five stats."],
+            ["/leaders", "Leaders", "Ranked leaderboards for all six stats."],
             ["/compare", "Compare", "Two players, stat by stat, honestly scaled."],
           ] as const
         ).map(([href, title, body]) => (
