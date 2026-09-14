@@ -410,4 +410,4 @@ $env:SPRING_PROFILES_ACTIVE = "prod"
 .\mvnw.cmd spring-boot:run
 ```
 
-The production profile disables write operations and requires `CORS_ALLOWED_ORIGINS` to be set. If production writes are eventually needed, add authentication and authorization before enabling them.
+The production profile reads `APP_WRITE_ENABLED`, defaulting to `false` when it is missing, and requires `CORS_ALLOWED_ORIGINS` to be set. Set `APP_WRITE_ENABLED=true` to enable writes; admin HTTP Basic authentication is still required. The Render Blueprint sets this flag to `true`.
