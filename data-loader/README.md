@@ -60,7 +60,7 @@ repository, so no credential can be committed by accident:
     venv\           pinned dependencies
     config.ps1      credentials, ACL'd to your account only
     logs\           one timestamped log per run, pruned after 30 days
-    LAST_RUN.txt    OK/FAIL summary of the most recent run
+    LAST_RUN.txt    OK/SKIP/FAIL summary of the most recent run
 ```
 
 ## Connecting to Supabase
@@ -89,15 +89,17 @@ Four independent things now have to agree before a refresh is considered good:
 
 1. **The loader's roster guard.** More than 2 of 30 team rosters failing aborts
    the run, rather than importing players without positions.
-2. **The loader's shrink guard.** If the new table would be under 90% of the
-   previous row count, it raises and rolls back.
+2. **The loader's shrink guard.** Fewer than 300 inserted rows always raises
+   and rolls back. Within the same season, a table under 90% of the previous
+   row count also rolls back; a new season is not compared to the old season's count.
 3. **`verify_player_table.py`.** Reconnects from scratch after the commit and
    checks the row count against an absolute floor of 300, checks it did not
-   shrink more than 10%, checks every row carries the expected season, and
+   shrink more than 10% within the same season, checks every row carries the expected season, and
    checks no row has an empty name. The absolute floor matters because guard 2
    is vacuous when the previous count is 0 — `0 < 0 * 0.9` is false, so an
    empty table would otherwise accept anything.
-4. **`run_refresh.ps1`.** Any non-zero exit becomes a `FAIL` in `LAST_RUN.txt`,
+4. **`run_refresh.ps1`.** Loader exit 3 becomes `SKIP` in `LAST_RUN.txt`, a
+   success healthcheck ping, and task exit 0. Other non-zero exits become `FAIL`,
    a non-zero task result, and a `/fail` ping with the last 40 log lines.
 
 Because the loader wraps `DELETE` + `INSERT` in a single transaction, a failure
@@ -143,12 +145,30 @@ proof that the endpoint, the pooler, the credentials, and the guards all still
 work. A pipeline that only wakes up in October is a pipeline that discovers its
 breakage in October.
 
-**Expect noise at the season rollover.** On 1 October 2026 the loader starts
-requesting season `2026-27`, which has no games until roughly 21 October.
-`LeagueDashPlayerStats` will return nothing usable, the shrink guard will fire,
-and the run will fail loudly every day for about three weeks. The data stays
-safe throughout — but if the daily failure mail gets annoying, that is the thing
-to fix, not the schedule.
+**Season rollover skips gracefully.** On 1 October 2026 the loader starts
+requesting season `2026-27`. Before deleting anything, it reads the existing
+row count and season and fetches the target season's per-game stats. If the
+target is newer and fewer than 300 players have GP > 0, it keeps the old table
+and exits 3. The wrapper records `SKIP` with
+`season not started; kept <season> (<rows> rows)`, skips verification, sends a
+success healthcheck ping, and exits 0.
+
+Once at least 300 players have games, the loader attempts the switchover. It
+still requires at least 300 actual inserts, but does not apply the 90% ratio
+against a different season. Same-season empty responses remain hard failures.
+The first new-season load will usually be several games in; leaderboard
+minimums already prorate to the games played (at four games: GP 3, 3PM 4,
+FGM 15, FTM 7). The 300-player gate does not itself enforce a minimum game count.
+
+Run the isolated tests without database credentials or NBA requests:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m pytest tests -q
+```
+
+`verify_player_table.py --print-season` prints the existing maximum season,
+or an empty line for an empty table, for the wrapper's pre-load snapshot.
 
 ## Manual operation
 

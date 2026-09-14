@@ -22,10 +22,8 @@ from nba_api.stats.static import teams
 # Player names contain accents (Doncic, Jokic, Porzingis). Without this the
 # progress prints below raise UnicodeEncodeError on a cp1252 Windows console,
 # which aborts the entire run partway through the alphabet.
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
-print("RUNNING FILE:", Path(__file__).resolve())
-print("RUN TIME:", datetime.now())
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # Database connection details
 DB_NAME = os.getenv("NBA_DB_NAME", "nba")
@@ -48,6 +46,7 @@ MAX_FAILED_TEAMS = 2
 # A refresh that lands well below the previous table size means something went
 # wrong upstream, so roll back instead of publishing a gutted table.
 MIN_ROWS_RATIO_VS_PREVIOUS = 0.9
+ABSOLUTE_FLOOR = 300
 NBA_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Encoding": "gzip, deflate, br",
@@ -251,12 +250,12 @@ def insert_player(cursor, player_data):
     )
 
 
-def fetch_and_insert_players():
+def fetch_and_insert_players(today=None):
     """
     Pulls active NBA players and inserts stats for the current NBA season.
     Rebuilds the player table each run.
     """
-    target_start_year = get_current_nba_season_start_year()
+    target_start_year = get_current_nba_season_start_year(today=today)
     target_season_id = build_season_id(target_start_year)
 
     print(f"Connecting to DB and starting player import...")
@@ -270,17 +269,9 @@ def fetch_and_insert_players():
     missing_position_count = 0
 
     try:
-        cursor.execute("SELECT count(*) FROM player;")
-        previous_count = cursor.fetchone()[0]
+        cursor.execute("SELECT count(*), max(season) FROM player;")
+        previous_count, previous_season = cursor.fetchone()
         print(f"Player table currently holds {previous_count} rows.")
-
-        # Clear existing data so table always reflects the latest refresh.
-        # This stays inside one transaction so a failed run can be rolled back.
-        cursor.execute("DELETE FROM player;")
-        print("Cleared existing player table.")
-
-        nba_players = players.get_active_players()
-        print(f"Found {len(nba_players)} active players.")
 
         season_stats = fetch_with_retry(
             lambda: leaguedashplayerstats.LeagueDashPlayerStats(
@@ -294,11 +285,25 @@ def fetch_and_insert_players():
         )
         stats_df = season_stats.get_data_frames()[0]
 
+        if not stats_df.empty and not {"PLAYER_ID", "GP"}.issubset(stats_df.columns):
+            raise RuntimeError("League stats response is missing PLAYER_ID or GP.")
+
+        players_with_games = {
+            int(row["PLAYER_ID"])
+            for _, row in stats_df.iterrows()
+            if row.get("PLAYER_ID") is not None and safe_float(row.get("GP")) > 0
+        }
+        is_rollover = previous_season is not None and target_start_year > previous_season
+        if is_rollover and len(players_with_games) < ABSOLUTE_FLOOR:
+            print(
+                f"SEASON NOT STARTED: {target_season_id} has {len(players_with_games)} "
+                f"players with games; keeping season {previous_season} ({previous_count} rows)"
+            )
+            conn.rollback()
+            return 3
+
         if stats_df.empty:
             raise RuntimeError(f"No league stats returned for season {target_season_id}.")
-
-        if "PLAYER_ID" not in stats_df.columns:
-            raise RuntimeError("League stats response is missing PLAYER_ID.")
 
         stats_by_player_id = {
             int(row["PLAYER_ID"]): row
@@ -306,6 +311,13 @@ def fetch_and_insert_players():
             if row.get("PLAYER_ID") is not None
         }
         print(f"Fetched current-season stats for {len(stats_by_player_id)} players.")
+
+        # Only clear after the new-season availability check. All writes remain
+        # in one transaction, including the floor and same-season shrink guard.
+        cursor.execute("DELETE FROM player;")
+        print("Cleared existing player table.")
+        nba_players = players.get_active_players()
+        print(f"Found {len(nba_players)} active players.")
 
         # The per-game response above carries FGM/FGA/FG3M/FG3A as per-game
         # averages, so recovering season totals from it means multiplying a
@@ -410,7 +422,16 @@ def fetch_and_insert_players():
             inserted_count += 1
             print(f"  Inserted: {full_name} | {team} | {position} | PPG: {ppg:.1f}")
 
-        if inserted_count < previous_count * MIN_ROWS_RATIO_VS_PREVIOUS:
+        if inserted_count < ABSOLUTE_FLOOR:
+            raise RuntimeError(
+                f"Only {inserted_count} players would be imported, below the absolute "
+                f"floor of {ABSOLUTE_FLOOR}; rolling back."
+            )
+
+        if (
+            previous_season == target_start_year
+            and inserted_count < previous_count * MIN_ROWS_RATIO_VS_PREVIOUS
+        ):
             raise RuntimeError(
                 f"Only {inserted_count} players would be imported, down from "
                 f"{previous_count}. Refusing to commit a table this much smaller; "
@@ -429,7 +450,10 @@ def fetch_and_insert_players():
     print(f"Inserted: {inserted_count}")
     print(f"Skipped (no current season row / no GP): {skipped_no_season}")
     print(f"Inserted without a position: {missing_position_count}")
+    return 0
 
 
 if __name__ == "__main__":
-    fetch_and_insert_players()
+    print("RUNNING FILE:", Path(__file__).resolve())
+    print("RUN TIME:", datetime.now())
+    sys.exit(fetch_and_insert_players())
