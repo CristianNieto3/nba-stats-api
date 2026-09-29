@@ -12,7 +12,7 @@ nba_api==1.11.4
 
 # nba_api's own pins are loose, so pin what it pulls in as well.
 pandas==3.0.5
-numpy==1.26.4
+numpy==2.5.3
 requests==2.34.2
 
 # psycopg2-binary, not psycopg2: the ubuntu runner has no libpq-dev, so the
